@@ -1,0 +1,2 @@
+"NSAudioCaptureUsageDescription" = "OverLingo uses system audio access to translate audio playing on this Mac.";
+"NSMicrophoneUsageDescription" = "OverLingo uses microphone access to translate your speech.";

@@ -1,0 +1,634 @@
+:root {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    color-scheme: dark;
+    background: transparent;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body,
+#overlay {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: transparent;
+}
+
+button,
+select,
+input {
+    font: inherit;
+}
+
+button {
+    cursor: default;
+}
+
+.overlay-shell {
+    --overlay-opacity: .75;
+    --font-scale: 1;
+    /* The panel carries legibility while it is opaque; as it fades the glyphs have to
+       carry it themselves, so the outline grows exactly as the backdrop disappears. */
+    --subtitle-ink: calc(1 - var(--overlay-opacity));
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 18px;
+    background: rgba(17, 18, 22, var(--overlay-opacity));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07);
+    color: rgba(255, 255, 255, .96);
+}
+
+.overlay-chrome {
+    position: absolute;
+    z-index: 4;
+    top: 7px;
+    right: 7px;
+    left: 7px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Session metadata rather than subtitle content: present when the user reaches for the
+   overlay, out of the way while they are reading. */
+.overlay-reveal {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-3px);
+    transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.overlay-shell:hover .overlay-reveal,
+.overlay-shell.settings-open .overlay-reveal {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+/* Clicks pass through, so hover cannot be trusted; the pointer watcher drives it instead. */
+.overlay-shell.click-through .overlay-reveal {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-3px);
+}
+
+.overlay-shell.click-through.pointer-over-controls .overlay-reveal,
+.overlay-shell.click-through.settings-open .overlay-reveal {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.drag-surface {
+    align-self: stretch;
+    flex: 1;
+    cursor: grab;
+}
+
+.overlay-chrome nav {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid rgba(255, 255, 255, .13);
+    border-radius: 10px;
+    background: rgba(24, 25, 30, .9);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
+    backdrop-filter: blur(18px);
+}
+
+.overlay-chrome button,
+.overlay-settings-panel button {
+    appearance: none;
+    border: 0;
+    color: rgba(255, 255, 255, .7);
+}
+
+.overlay-chrome button {
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 7px;
+    background: transparent;
+    transition: color 100ms ease, background 100ms ease;
+}
+
+.overlay-chrome button:hover,
+.overlay-chrome button.active {
+    background: rgba(255, 255, 255, .1);
+    color: #fff;
+}
+
+.overlay-chrome button.active {
+    color: #aebcff;
+}
+
+.overlay-chrome button:active {
+    background: rgba(255, 255, 255, .18);
+}
+
+.overlay-chrome button:disabled,
+.overlay-settings-panel button:disabled {
+    opacity: .42;
+}
+
+.overlay-chrome .translation-control {
+    width: auto;
+    display: flex;
+    gap: 5px;
+    padding: 0 9px;
+    background: rgba(91, 120, 255, .2);
+    color: #e0e6ff;
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.overlay-chrome .translation-control.running {
+    background: rgba(55, 181, 121, .17);
+    color: #a9efcb;
+}
+
+.translation-control time {
+    color: rgba(255, 255, 255, .48);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+
+.stop-translation,
+.close-overlay {
+    color: rgba(255, 145, 145, .75) !important;
+}
+
+.overlay-settings-panel {
+    position: absolute;
+    z-index: 5;
+    top: 43px;
+    right: 8px;
+    width: min(690px, calc(100% - 16px));
+    max-height: calc(100% - 51px);
+    overflow: auto;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, .15);
+    border-radius: 14px;
+    background: rgba(27, 28, 34, .97);
+    box-shadow: 0 22px 58px rgba(0, 0, 0, .42);
+    backdrop-filter: blur(24px);
+}
+
+.source-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.source-settings-card {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid rgba(111, 133, 255, .18);
+    border-radius: 11px;
+    background: rgba(85, 112, 244, .07);
+}
+
+.source-settings-card.system {
+    border-color: rgba(62, 191, 130, .18);
+    background: rgba(43, 161, 104, .065);
+}
+
+.source-settings-card.disabled > :not(header) {
+    opacity: .45;
+}
+
+.source-settings-card > header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 9px;
+}
+
+.source-settings-card > header > span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255, 255, 255, .88);
+    font-size: 12px;
+    font-weight: 680;
+}
+
+.source-settings-card.system > header > span {
+    color: #8de3b6;
+}
+
+.mini-switch {
+    position: relative;
+    width: 28px;
+    height: 17px;
+}
+
+.mini-switch input {
+    position: absolute;
+    opacity: 0;
+}
+
+.mini-switch i {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .18);
+    transition: background 120ms ease;
+}
+
+.mini-switch i::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .28);
+    transition: transform 120ms ease;
+}
+
+.mini-switch input:checked + i {
+    background: #5473f3;
+}
+
+.source-settings-card.system .mini-switch input:checked + i {
+    background: #2da36e;
+}
+
+.mini-switch input:checked + i::after {
+    transform: translateX(11px);
+}
+
+.compact-select {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+}
+
+.compact-select > span {
+    color: rgba(255, 255, 255, .46);
+    font-size: 9px;
+    font-weight: 620;
+}
+
+.compact-select select {
+    width: 100%;
+    height: 28px;
+    min-width: 0;
+    appearance: none;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 7px;
+    outline: none;
+    background: rgba(255, 255, 255, .07);
+    color: rgba(255, 255, 255, .88);
+    padding: 0 23px 0 8px;
+    font-size: 10px;
+    text-overflow: ellipsis;
+}
+
+/* WebView2 does not consistently apply the inherited dark color scheme to the
+   native select popup, which can otherwise leave white option text on white. */
+.compact-select select option {
+    background: #292a2f;
+    color: #f1f1f3;
+}
+
+.compact-select select:focus {
+    border-color: rgba(114, 139, 255, .7);
+}
+
+.compact-select.full-width {
+    margin-bottom: 8px;
+}
+
+.language-pair-mini {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr);
+    align-items: end;
+    gap: 5px;
+}
+
+.compact-select.translator-select {
+    margin-top: 8px;
+}
+
+.swap-mini {
+    width: 26px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: 7px;
+    background: transparent;
+}
+
+.swap-mini:hover {
+    background: rgba(255, 255, 255, .08);
+    color: #fff;
+}
+
+.overlay-display-settings {
+    display: grid;
+    grid-template-columns: minmax(150px, .85fr) minmax(145px, 1fr) minmax(145px, 1fr);
+    align-items: end;
+    gap: 14px;
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, .045);
+}
+
+.content-toggle,
+.overlay-range-row {
+    display: grid;
+    gap: 7px;
+}
+
+.content-toggle > span,
+.overlay-range-row > span {
+    color: rgba(255, 255, 255, .57);
+    font-size: 10px;
+    font-weight: 620;
+}
+
+.content-toggle > div {
+    display: flex;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, .18);
+}
+
+.content-toggle button {
+    flex: 1;
+    height: 25px;
+    border-radius: 6px;
+    background: transparent;
+    font-size: 10px;
+}
+
+.content-toggle button.active {
+    background: rgba(255, 255, 255, .12);
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
+}
+
+.overlay-switch-row {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 9px;
+    border-top: 1px solid rgba(255, 255, 255, .07);
+}
+
+.overlay-switch-row > span:first-child {
+    color: rgba(255, 255, 255, .57);
+    font-size: 10px;
+    font-weight: 620;
+}
+
+.overlay-range-row output {
+    float: right;
+    color: rgba(255, 255, 255, .84);
+    font-variant-numeric: tabular-nums;
+}
+
+.overlay-range-row input {
+    width: 100%;
+    accent-color: #768eff;
+}
+
+.overlay-settings-panel footer {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, .08);
+}
+
+.more-settings {
+    width: 100%;
+    height: 29px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 7px;
+    border-radius: 7px;
+    background: transparent;
+    font-size: 11px;
+    text-align: left;
+}
+
+.more-settings:hover {
+    background: rgba(255, 255, 255, .07);
+    color: #fff;
+}
+
+.more-settings span {
+    margin-left: auto;
+    font-size: 17px;
+}
+
+.overlay-routes {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(var(--active-route-count), minmax(0, 1fr));
+    gap: 1px;
+    /* Top inset matches the toolbar's, so each route header shares its centre line. */
+    padding: 7px 9px 9px;
+}
+
+.overlay-route {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0 14px 12px;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, .025);
+}
+
+.overlay-route + .overlay-route {
+    margin-left: 1px;
+    border-left: 1px solid rgba(255, 255, 255, .1);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+/* Same height as the toolbar it sits beside, so labels line up with its buttons. */
+.overlay-route > header {
+    flex: none;
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    padding-right: 150px;
+}
+
+.route-direction {
+    display: inline-flex;
+    max-width: 100%;
+    padding: 3px 7px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: rgba(90, 116, 247, .17);
+    color: #b8c4ff;
+    font-size: 10px;
+    font-weight: 680;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.route-direction.system {
+    background: rgba(44, 172, 108, .15);
+    color: #93e3ba;
+}
+
+.overlay-route > header .route-status {
+    flex: none;
+    margin-left: 6px;
+    color: rgba(232, 236, 255, .55);
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+/* Sits where the transient status labels do, so a failed route reads the same way a
+   connecting one does instead of pushing the subtitles down. */
+.route-failure {
+    /* The toolbar's drag surface hangs over this row; without lifting it the retry and
+       settings buttons are covered by a drag region the moment the toolbar is revealed. */
+    position: relative;
+    z-index: 4;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 6px;
+    color: #ffb3b3;
+    font-size: 10px;
+    line-height: 1.2;
+}
+
+.route-failure > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.route-failure button {
+    flex: none;
+    display: inline-flex;
+    padding: 3px;
+    border: 0;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, .12);
+    color: inherit;
+    cursor: pointer;
+}
+
+.route-failure button:hover {
+    background: rgba(255, 255, 255, .18);
+}
+
+.overlay-turns {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: calc(8px * var(--font-scale));
+    overflow: hidden;
+}
+
+.overlay-turn[hidden] {
+    display: none;
+}
+
+.overlay-turn p,
+.overlay-turn strong {
+    display: block;
+    margin: 0;
+    overflow-wrap: anywhere;
+    /* Painted under the fill, so the outline never thins the letterforms. */
+    paint-order: stroke fill;
+    -webkit-text-stroke: calc(3px * var(--font-scale)) rgba(0, 0, 0, calc(.8 * var(--subtitle-ink)));
+    text-shadow: 0 1px 3px rgba(0, 0, 0, calc(.75 * var(--subtitle-ink)));
+}
+
+.overlay-turn p {
+    color: rgba(255, 255, 255, .62);
+    font-size: calc(13px * var(--font-scale));
+    font-weight: 480;
+    line-height: 1.38;
+}
+
+.overlay-turn strong {
+    color: rgba(255, 255, 255, .98);
+    font-size: calc(17px * var(--font-scale));
+    font-weight: 650;
+    line-height: 1.38;
+}
+
+.overlay-turn p + strong {
+    margin-top: calc(2px * var(--font-scale));
+}
+
+.overlay-turn.draft {
+    opacity: .78;
+}
+
+.overlay-empty {
+    margin: auto;
+    align-self: center;
+    color: rgba(255, 255, 255, .3);
+    font-size: calc(12px * var(--font-scale));
+}
+
+@media (max-width: 700px) {
+    .source-settings-grid,
+    .overlay-display-settings {
+        grid-template-columns: 1fr;
+    }
+
+    .overlay-settings-panel {
+        width: min(355px, calc(100% - 16px));
+    }
+
+    .overlay-route {
+        padding-inline: 9px;
+    }
+
+    .overlay-route > header {
+        padding-right: 120px;
+    }
+}
+
+@media (max-height: 220px) {
+    .overlay-settings-panel {
+        top: 39px;
+        max-height: calc(100% - 45px);
+    }
+
+    .overlay-route {
+        padding-block: 0 7px;
+    }
+}

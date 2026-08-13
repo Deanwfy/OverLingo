@@ -1,0 +1,55 @@
+[package]
+name = "overlingo"
+version = "0.1.0"
+description = "Live bilingual subtitles over any app"
+license = "MIT"
+edition = "2021"
+rust-version = "1.88"
+
+[lib]
+name = "overlingo_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[features]
+devtools = ["tauri/devtools"]
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
+tauri-plugin-autostart = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sys-locale = "0.3"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+cpal = "0.15"
+base64 = "0.22"
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+futures-util = "0.3"
+http = "1"
+rand = "0.8"
+tokio = { version = "1", features = ["sync", "rt", "macros", "time"] }
+rubato = "0.16"
+tauri-plugin-opener = "2.5.4"
+tauri-plugin-dialog = "2.7.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3.6.3", default-features = false, features = ["apple-native"] }
+objc2 = "0.6"
+block2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "block2", "NSApplication", "NSEvent", "NSRunningApplication", "NSWindow", "NSWorkspace"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSDictionary", "NSString", "NSUUID", "NSValue"] }
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFBase", "CFDictionary", "CFString", "objc2"] }
+objc2-core-audio = { version = "0.3.2", default-features = false, features = ["std", "AudioHardware", "block2", "dispatch2", "objc2", "objc2-core-audio-types", "objc2-foundation"] }
+objc2-core-audio-types = { version = "0.3.2", default-features = false, features = ["std", "CoreAudioBaseTypes"] }
+tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", rev = "a3122e894383aa068ec5365a42994e3ac94ba1b6" }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+keyring = { version = "3.6.3", default-features = false, features = ["windows-native"] }
+windows = { version = "0.58", features = [
+  "Win32_Media_Audio",
+  "Win32_System_Com",
+  "Win32_Foundation",
+] }

@@ -1,0 +1,46 @@
+{
+  "name": "overlingo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Live bilingual subtitles over any app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Deanwfy/OverLingo.git"
+  },
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": "^24.0.0"
+  },
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev --config src-tauri/tauri.dev.conf.json --features devtools",
+    "dev:web": "vite --host 127.0.0.1",
+    "build": "tauri build",
+    "build:macos:x64": "tauri build --target x86_64-apple-darwin",
+    "build:macos:arm64": "tauri build --target aarch64-apple-darwin",
+    "build:windows:x64": "tauri build --target x86_64-pc-windows-msvc",
+    "build:windows:arm64": "tauri build --target aarch64-pc-windows-msvc",
+    "build:dev": "tauri build --config src-tauri/tauri.dev.conf.json --features devtools --bundles app",
+    "lint": "cd src-tauri && cargo clippy --all-targets -- -D warnings",
+    "format": "cd src-tauri && cargo fmt",
+    "format:check": "cd src-tauri && cargo fmt --check",
+    "build:web": "vite build",
+    "check:web": "svelte-check --tsconfig ./tsconfig.json",
+    "test:web": "node --test tests/*.test.mjs",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test": "npm run test:web && npm run check:web && npm run test:rust && npm run format:check && npm run lint && npm run build:web"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.2.0",
+    "@tauri-apps/cli": "^2.11.4",
+    "svelte-check": "^4.7.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.0"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/plugin-autostart": "^2.5.1",
+    "svelte": "^5.56.8"
+  }
+}

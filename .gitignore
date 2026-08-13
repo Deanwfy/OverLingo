@@ -1,0 +1,14 @@
+*.log
+npm-debug.log*
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+.playwright-cli/
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+.env
+.env.local
+*.local

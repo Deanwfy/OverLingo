@@ -1,0 +1,2 @@
+"NSAudioCaptureUsageDescription" = "OverLingo 需要访问系统音频，才能翻译这台 Mac 正在播放的内容。";
+"NSMicrophoneUsageDescription" = "OverLingo 需要访问麦克风，才能翻译你的讲话。";

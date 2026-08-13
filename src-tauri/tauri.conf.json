@@ -1,0 +1,86 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "OverLingo",
+  "identifier": "com.deanwfy.overlingo",
+  "build": {
+    "beforeDevCommand": "npm run dev:web",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build:web",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "OverLingo",
+        "width": 980,
+        "height": 650,
+        "minWidth": 820,
+        "minHeight": 620,
+        "center": true,
+        "visible": false,
+        "transparent": false,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "trafficLightPosition": {
+          "x": 16,
+          "y": 17
+        },
+        "hiddenTitle": true,
+        "acceptFirstMouse": true,
+        "alwaysOnTop": false,
+        "resizable": true,
+        "skipTaskbar": false
+      },
+      {
+        "label": "overlay",
+        "title": "OverLingo Subtitles",
+        "url": "overlay.html",
+        "width": 1000,
+        "height": 360,
+        "minWidth": 520,
+        "minHeight": 140,
+        "center": true,
+        "visible": false,
+        "focus": false,
+        "acceptFirstMouse": true,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "resizable": true,
+        "skipTaskbar": true,
+        "shadow": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc://localhost http://ipc.localhost; img-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "en.lproj": "en.lproj",
+      "es.lproj": "es.lproj",
+      "zh-Hans.lproj": "zh-Hans.lproj",
+      "ja.lproj": "ja.lproj",
+      "ko.lproj": "ko.lproj",
+      "vi.lproj": "vi.lproj",
+      "../THIRD_PARTY_LICENSES.md": "THIRD_PARTY_LICENSES.md"
+    },
+    "macOS": {
+      "entitlements": "Entitlements.plist",
+      "frameworks": [],
+      "minimumSystemVersion": "14.4"
+    },
+    "createUpdaterArtifacts": false
+  }
+}

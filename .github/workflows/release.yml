@@ -1,0 +1,145 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  # Builds every target without touching a release, so the pipeline can be
+  # exercised before a tag exists.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # One job owns the release so the parallel builds never race to create it.
+  draft:
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    outputs:
+      release_id: ${{ steps.create.outputs.result }}
+    steps:
+      - uses: actions/checkout@v7
+      # The bundles take their version from the crate, so a tag that disagrees
+      # would publish downloads whose filenames contradict what they install.
+      - name: Check the tag against the crate version
+        run: |
+          crate=$(grep -m1 '^version' src-tauri/Cargo.toml | cut -d'"' -f2)
+          tag=${GITHUB_REF_NAME#v}
+          if [ "$crate" != "$tag" ]; then
+            echo "tag $GITHUB_REF_NAME does not match crate version $crate" >&2
+            exit 1
+          fi
+      - id: create
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: context.ref.replace('refs/tags/', ''),
+              name: `OverLingo ${context.ref.replace('refs/tags/', '')}`,
+              draft: true,
+              generate_release_notes: true,
+            })
+            return data.id
+
+  quality:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: [draft, quality]
+    # The dispatch runs have no draft to depend on, so that dependency is skipped
+    # rather than required; `always()` means quality has to be named explicitly.
+    if: always() && needs.draft.result != 'failure' && needs.quality.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-26
+            target: aarch64-apple-darwin
+          - os: macos-26
+            target: x86_64-apple-darwin
+          - os: windows-2025
+            target: x86_64-pc-windows-msvc
+          - os: windows-2025
+            target: aarch64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: rustup toolchain install
+      - run: rustup target add ${{ matrix.target }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target }}
+      - run: npm ci
+
+      # An unset secret still arrives as an empty string, which the bundler takes
+      # for a certificate and dies importing, so the check has to be explicit.
+      - name: Require a signing certificate
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+        run: |
+          [ -n "$APPLE_CERTIFICATE" ] || { echo "::error::macOS builds need APPLE_CERTIFICATE"; exit 1; }
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          releaseId: ${{ needs.draft.outputs.release_id }}
+          args: --target ${{ matrix.target }}
+
+      - name: Keep the unpublished bundles
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
+          if-no-files-found: error
+
+  # Only reached when every target built: a release missing an architecture is
+  # worse than no release at all, and `needs` skips this job if any build failed.
+  publish:
+    needs: [draft, build]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const release_id = Number(${{ needs.draft.outputs.release_id }})
+            const { data: assets } = await github.rest.repos.listReleaseAssets({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id,
+              per_page: 100,
+            })
+            // Two macOS disk images and, per Windows architecture, an NSIS
+            // installer and an MSI package.
+            const expected = { '.dmg': 2, '.exe': 2, '.msi': 2 }
+            for (const [suffix, count] of Object.entries(expected)) {
+              const found = assets.filter(asset => asset.name.endsWith(suffix)).length
+              if (found !== count) {
+                throw new Error(`expected ${count} ${suffix} assets, found ${found}`)
+              }
+            }
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id,
+              draft: false,
+            })

@@ -1,0 +1,2 @@
+"NSAudioCaptureUsageDescription" = "이 Mac에서 재생되는 오디오를 번역하기 위해 OverLingo가 시스템 오디오에 접근합니다.";
+"NSMicrophoneUsageDescription" = "사용자의 음성을 번역하기 위해 OverLingo가 마이크에 접근합니다.";

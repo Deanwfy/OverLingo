@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "OverLingo Dev",
+  "identifier": "com.deanwfy.overlingo.dev",
+  "bundle": {
+    "macOS": {
+      "signingIdentity": "-"
+    }
+  }
+}

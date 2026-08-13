@@ -1,0 +1,2 @@
+"NSAudioCaptureUsageDescription" = "このMacで再生中の音声を翻訳するため、OverLingoがシステム音声にアクセスします。";
+"NSMicrophoneUsageDescription" = "話した内容を翻訳するため、OverLingoがマイクにアクセスします。";
