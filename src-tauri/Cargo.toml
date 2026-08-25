@@ -1,6 +1,6 @@
 [package]
 name = "overlingo"
-version = "0.1.0"
+version = "1.0.0"
 description = "Live bilingual subtitles over any app"
 license = "MIT"
 edition = "2021"
