@@ -7,6 +7,10 @@
 set -euo pipefail
 
 version=${1:?a version, e.g. 0.2.0}
+command -v git-cliff >/dev/null || {
+  echo "git-cliff is required to regenerate CHANGELOG.md: brew install git-cliff" >&2
+  exit 1
+}
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || {
   echo "not a semver version: $version" >&2
   exit 1
@@ -30,6 +34,8 @@ sed -i '' "s/^version = \".*\"/version = \"$version\"/" src-tauri/Cargo.toml
 (cd src-tauri && cargo update --workspace --offline >/dev/null)
 # `npm version` rather than an edit in place: it carries the number into package-lock.json too.
 npm version "$version" --no-git-tag-version >/dev/null
+
+git-cliff --tag "v$version" -o CHANGELOG.md
 
 npm test
 
