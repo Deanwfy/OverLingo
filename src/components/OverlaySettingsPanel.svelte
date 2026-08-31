@@ -2,6 +2,7 @@
     import type {
         ControllerSnapshot,
         OverlayAction,
+        OverlayLayout,
         OverlaySettingsPatch,
         RouteConfig,
         RouteId,
@@ -115,6 +116,12 @@
     function toggleContent(field: 'showOriginal' | 'showTranslation') {
         update({ [field]: !state.config[field] });
     }
+
+    const layouts: OverlayLayout[] = ['split', 'merged'];
+    const layoutLabel: Record<OverlayLayout, 'layoutSplit' | 'layoutMerged'> = {
+        split: 'layoutSplit',
+        merged: 'layoutMerged',
+    };
 </script>
 
 <section class="overlay-settings-panel" aria-label={t('overlaySettings')}>
@@ -227,6 +234,19 @@
                     aria-pressed={state.config.showTranslation}
                     onclick={() => toggleContent('showTranslation')}
                 >{t('showTranslation')}</button>
+            </div>
+        </div>
+        <div class="content-toggle">
+            <span>{t('subtitleLayout')}</span>
+            <div role="radiogroup" aria-label={t('subtitleLayout')}>
+                {#each layouts as layout}
+                    <button
+                        role="radio"
+                        class:active={state.config.layout === layout}
+                        aria-checked={state.config.layout === layout}
+                        onclick={() => update({ layout })}
+                    >{t(layoutLabel[layout])}</button>
+                {/each}
             </div>
         </div>
         <label class="overlay-range-row">

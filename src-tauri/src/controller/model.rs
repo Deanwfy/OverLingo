@@ -66,6 +66,7 @@ pub struct OverlaySettingsPatch {
     pub(super) click_through: Option<bool>,
     pub(super) show_original: Option<bool>,
     pub(super) show_translation: Option<bool>,
+    pub(super) layout: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

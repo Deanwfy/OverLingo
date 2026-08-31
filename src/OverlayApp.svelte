@@ -9,6 +9,7 @@
         RouteId,
         RouteState,
     } from './app/types';
+    import { mergeTimeline } from './app/timeline';
     import Icon from './components/Icon.svelte';
     import OverlaySettingsPanel from './components/OverlaySettingsPanel.svelte';
     import { setLocale, t } from './core/locale.svelte';
@@ -34,6 +35,12 @@
     const routeIds: RouteId[] = ['system', 'microphone'];
     let activeRouteCount = $derived(
         routeIds.filter(routeId => overlayState?.routes[routeId]?.config.enabled !== false).length,
+    );
+    // A single route already occupies the whole overlay, so merging only means anything
+    // with two of them.
+    let merged = $derived(activeRouteCount > 1 && overlayState?.config.layout === 'merged');
+    let timeline = $derived(
+        overlayState && merged ? mergeTimeline(overlayState.routes, routeIds) : [],
     );
     let controlLabel = $derived(
         overlayState?.translationState === 'paused' ? 'resume'
@@ -175,17 +182,20 @@
         await sendControllerAction({ type: 'hide' });
     }
 
-    function fitKey(routeId: RouteId) {
+    function fitKey(...ids: RouteId[]) {
         if (!overlayState) return '';
-        const route = overlayState.routes[routeId];
+        const routes = ids.map(routeId => overlayState!.routes[routeId]);
         return [
             overlayState.config.fontScale,
             overlayState.config.showOriginal,
             overlayState.config.showTranslation,
-            route.turns.length,
-            route.draft.original,
-            route.draft.translation,
+            ...routes.flatMap(route => [route.turns.length, route.draft.original, route.draft.translation]),
         ].join(':');
+    }
+
+    function routeIsEmpty(routeId: RouteId) {
+        const route = overlayState?.routes[routeId];
+        return !route || (route.turns.length === 0 && !route.draft.original && !route.draft.translation);
     }
 
     function fitSubtitleTurns(node: HTMLElement, _dependency: string) {
@@ -235,7 +245,7 @@
         class:click-through={overlayState.config.clickThrough}
         class:pointer-over-controls={pointerOverControls}
         class="overlay-shell"
-        style:--active-route-count={Math.max(activeRouteCount, 1)}
+        style:--active-route-count={merged ? 1 : Math.max(activeRouteCount, 1)}
         style:--overlay-opacity={overlayState.config.opacity}
         style:--font-scale={overlayState.config.fontScale}
     >
@@ -295,52 +305,74 @@
             />
         {/if}
 
-        <div class="overlay-routes">
-            {#each routeIds as routeId}
-                {@const routeState = overlayState.routes[routeId]}
-                {#if routeState?.config.enabled !== false}
-                    <section class="overlay-route">
-                        <header>
-                            <span class="route-direction overlay-reveal" class:system={routeId === 'system'} lang={routeState.config.targetLanguage}>{direction(routeState.config)}</span>
-                            {#if routeState.state === 'failed'}
-                                {@const message = readableError(routeState.error)}
-                                <span class="route-failure" role="alert">
-                                    <span title={message}>{message}</span>
-                                    <button
-                                        title={t('retryRoute')}
-                                        aria-label={t('retryRoute')}
-                                        onclick={() => send({ type: 'retryRoute', routeId })}
-                                    ><Icon name="retry" size={13} /></button>
-                                    <button
-                                        title={t('openSettings')}
-                                        aria-label={t('openSettings')}
-                                        onclick={openMoreSettings}
-                                    ><Icon name="settings" size={13} /></button>
-                                </span>
-                            {:else if routeStatus(routeState.state)}
-                                <small class="route-status">{t(routeStatus(routeState.state))}</small>
-                            {/if}
-                        </header>
-                        <div class="overlay-turns" use:fitSubtitleTurns={fitKey(routeId)}>
-                            {#each routeState.turns as turn}
-                                <article class="overlay-turn">
-                                    {#if overlayState.config.showOriginal && turn.original}<p>{turn.original}</p>{/if}
-                                    {#if overlayState.config.showTranslation && turn.translation}<strong>{turn.translation}</strong>{/if}
-                                </article>
-                            {/each}
-                            {#if routeState.draft.original || routeState.draft.translation}
-                                <article class="overlay-turn draft">
-                                    {#if overlayState.config.showOriginal && routeState.draft.original}<p>{routeState.draft.original}</p>{/if}
-                                    {#if overlayState.config.showTranslation && routeState.draft.translation}<strong>{routeState.draft.translation}</strong>{/if}
-                                </article>
-                            {/if}
-                            {#if routeState.turns.length === 0 && !routeState.draft.original && !routeState.draft.translation}
-                                <p class="overlay-empty">{t('emptyOverlay')}</p>
-                            {/if}
-                        </div>
-                    </section>
-                {/if}
-            {/each}
+        {#snippet routeHeader(snapshot: ControllerSnapshot, routeId: RouteId)}
+            {@const routeState = snapshot.routes[routeId]}
+            <span class="route-direction overlay-reveal" class:system={routeId === 'system'} lang={routeState.config.targetLanguage}>{direction(routeState.config)}</span>
+            {#if routeState.state === 'failed'}
+                {@const message = readableError(routeState.error)}
+                <span class="route-failure" role="alert">
+                    <span title={message}>{message}</span>
+                    <button
+                        title={t('retryRoute')}
+                        aria-label={t('retryRoute')}
+                        onclick={() => send({ type: 'retryRoute', routeId })}
+                    ><Icon name="retry" size={13} /></button>
+                    <button
+                        title={t('openSettings')}
+                        aria-label={t('openSettings')}
+                        onclick={openMoreSettings}
+                    ><Icon name="settings" size={13} /></button>
+                </span>
+            {:else if routeStatus(routeState.state)}
+                <small class="route-status">{t(routeStatus(routeState.state))}</small>
+            {/if}
+        {/snippet}
+
+        {#snippet turn(snapshot: ControllerSnapshot, routeId: RouteId, original: string, translation: string, draft: boolean)}
+            <article class="overlay-turn" class:draft data-route={routeId}>
+                {#if snapshot.config.showOriginal && original}<p>{original}</p>{/if}
+                {#if snapshot.config.showTranslation && translation}<strong>{translation}</strong>{/if}
+            </article>
+        {/snippet}
+
+        <div class="overlay-routes" class:merged>
+            {#if merged}
+                <section class="overlay-route merged">
+                    <header>
+                        {#each routeIds as routeId}
+                            {@render routeHeader(overlayState, routeId)}
+                        {/each}
+                    </header>
+                    <div class="overlay-turns" use:fitSubtitleTurns={fitKey(...routeIds)}>
+                        {#each timeline as entry}
+                            {@render turn(overlayState, entry.routeId, entry.original, entry.translation, entry.draft)}
+                        {/each}
+                        {#if timeline.length === 0}
+                            <p class="overlay-empty">{t('emptyOverlay')}</p>
+                        {/if}
+                    </div>
+                </section>
+            {:else}
+                {#each routeIds as routeId}
+                    {@const routeState = overlayState.routes[routeId]}
+                    {#if routeState?.config.enabled !== false}
+                        <section class="overlay-route">
+                            <header>{@render routeHeader(overlayState, routeId)}</header>
+                            <div class="overlay-turns" use:fitSubtitleTurns={fitKey(routeId)}>
+                                {#each routeState.turns as item}
+                                    {@render turn(overlayState, routeId, item.original, item.translation, false)}
+                                {/each}
+                                {#if routeState.draft.original || routeState.draft.translation}
+                                    {@render turn(overlayState, routeId, routeState.draft.original, routeState.draft.translation, true)}
+                                {/if}
+                                {#if routeIsEmpty(routeId)}
+                                    <p class="overlay-empty">{t('emptyOverlay')}</p>
+                                {/if}
+                            </div>
+                        </section>
+                    {/if}
+                {/each}
+            {/if}
         </div>
     </main>
 {/if}

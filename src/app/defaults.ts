@@ -42,6 +42,7 @@ export const DEFAULT_CONFIG: AppConfig = {
         clickThrough: true,
         showOriginal: true,
         showTranslation: true,
+        layout: 'split',
     },
     qwen: {
         region: 'beijing',

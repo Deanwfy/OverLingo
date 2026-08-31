@@ -4,6 +4,7 @@ export type RouteId = 'system' | 'microphone';
 export type TranslationState = 'stopped' | 'starting' | 'running' | 'paused' | 'failed';
 export type RouteState = 'stopped' | 'connecting' | 'live' | 'reconfiguring' | 'reconnecting' | 'failed';
 export type MainView = 'translation' | 'history' | 'general';
+export type OverlayLayout = 'split' | 'merged';
 
 export interface RouteConfig {
     enabled: boolean;
@@ -41,6 +42,7 @@ export interface AppConfig {
         clickThrough: boolean;
         showOriginal: boolean;
         showTranslation: boolean;
+        layout: OverlayLayout;
     };
     qwen: {
         region: 'beijing' | 'singapore';
@@ -55,6 +57,7 @@ export interface OverlaySettingsPatch {
     clickThrough?: boolean;
     showOriginal?: boolean;
     showTranslation?: boolean;
+    layout?: OverlayLayout;
 }
 
 export type ControllerAction =

@@ -480,6 +480,21 @@ button {
     padding-right: 150px;
 }
 
+.overlay-route.merged > header {
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* Merged timeline: a colour bar in the route's badge colour says who is speaking. */
+.overlay-route.merged .overlay-turn {
+    padding-left: 9px;
+    border-left: 3px solid rgba(90, 116, 247, .7);
+}
+
+.overlay-route.merged .overlay-turn[data-route='system'] {
+    border-left-color: rgba(44, 172, 108, .7);
+}
+
 .route-direction {
     display: inline-flex;
     max-width: 100%;

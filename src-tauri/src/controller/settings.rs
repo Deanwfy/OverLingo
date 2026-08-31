@@ -1,6 +1,6 @@
 use super::model::{OverlaySettingsPatch, QwenSettingsPatch, RouteSettingsPatch};
 use super::{enabled_route_ids, route_config, route_config_mut, Action, ControllerActor};
-use crate::app_config::{ApplicationReference, RouteConfig};
+use crate::app_config::{is_overlay_layout, ApplicationReference, RouteConfig};
 use crate::commands::audio;
 use crate::credentials::CredentialState;
 use crate::translators::{engine_of, route_config_error, start_blocker};
@@ -55,6 +55,9 @@ impl ControllerActor {
         }
         if !overlay.show_original && !overlay.show_translation {
             overlay.show_translation = true;
+        }
+        if let Some(layout) = patch.layout.filter(|value| is_overlay_layout(value)) {
+            overlay.layout = layout;
         }
         if patch.always_on_top.is_some() || patch.click_through.is_some() {
             self.apply_overlay_window_flags();

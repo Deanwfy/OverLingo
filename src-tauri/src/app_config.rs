@@ -65,6 +65,12 @@ pub struct OverlayConfig {
     pub click_through: bool,
     pub show_original: bool,
     pub show_translation: bool,
+    /// "split" or "merged"; see [`is_overlay_layout`].
+    pub layout: String,
+}
+
+pub(crate) fn is_overlay_layout(layout: &str) -> bool {
+    matches!(layout, "split" | "merged")
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -134,6 +140,7 @@ impl Default for OverlayConfig {
             click_through: true,
             show_original: true,
             show_translation: true,
+            layout: "split".into(),
         }
     }
 }
@@ -197,6 +204,9 @@ impl AppConfig {
         self.overlay.font_scale = self.overlay.font_scale.clamp(0.75, 1.8);
         if !self.overlay.show_original && !self.overlay.show_translation {
             self.overlay.show_translation = true;
+        }
+        if !is_overlay_layout(&self.overlay.layout) {
+            self.overlay.layout = "split".into();
         }
         if crate::translators::qwen_region(&self.qwen.region).is_none() {
             self.qwen.region = "beijing".into();
@@ -299,12 +309,14 @@ mod tests {
         config.overlay.opacity = 4.0;
         config.overlay.show_original = false;
         config.overlay.show_translation = false;
+        config.overlay.layout = "stacked".into();
         config.normalize();
 
         assert_eq!(config.routes.system.input, "system");
         assert_eq!(config.overlay.opacity, 1.0);
         assert!(!config.overlay.show_original);
         assert!(config.overlay.show_translation);
+        assert_eq!(config.overlay.layout, "split");
     }
 
     #[test]
