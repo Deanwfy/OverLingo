@@ -4,7 +4,7 @@
 
 <h1 align="center">OverLingo</h1>
 
-<p align="center"><strong>Live bilingual subtitles over any app.</strong></p>
+<p align="center"><strong>Live two-way subtitle overlay.</strong></p>
 
 <p align="center">
   English ·
@@ -15,7 +15,7 @@
   <img src=".github/assets/demo.png" width="720" alt="OverLingo showing live bilingual subtitles over a video">
 </p>
 
-OverLingo turns system audio and microphone speech into live bilingual subtitles in a compact desktop overlay. Use either route independently or both together in scenarios such as videos, presentations, and multilingual meetings.
+OverLingo turns system audio and microphone speech into live bilingual subtitles in a compact desktop overlay. Use either route independently or both together for videos, presentations, meetings, and more.
 
 ## Download
 
@@ -28,12 +28,32 @@ On first use, macOS asks for system audio recording permission, and for micropho
 
 ## Highlights
 
-- **Two audio routes** — system audio and microphone, usable at the same time
-- **Two subtitle tracks** — one per audio route, each with original and translation toggled independently
+- **Two routes, two tracks** — system audio and microphone, each with original and translation toggled independently
 - **Per-app capture on macOS** — capture the audio of a single chosen app
 - **A customizable overlay** — always on top, window size, text size, opacity, and show or hide are all adjustable
 - **Subtitle history** — browse past sessions and export them
 - **Your own API keys** — kept in an encrypted store on the device
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src=".github/assets/overlay-merged.png" alt="Merged layout"></td>
+    <td width="50%"><img src=".github/assets/overlay-settings.png" alt="Subtitle settings"></td>
+  </tr>
+  <tr>
+    <td align="center">Merged layout</td>
+    <td align="center">Subtitle settings</td>
+  </tr>
+  <tr>
+    <td><img src=".github/assets/main-history.png" alt="History"></td>
+    <td><img src=".github/assets/main-translators.png" alt="Translator setup"></td>
+  </tr>
+  <tr>
+    <td align="center">History</td>
+    <td align="center">Translator setup</td>
+  </tr>
+</table>
 
 ## Supported providers
 

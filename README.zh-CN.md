@@ -4,7 +4,7 @@
 
 <h1 align="center">OverLingo</h1>
 
-<p align="center"><strong>为任意应用叠加实时双语字幕。</strong></p>
+<p align="center"><strong>实时双向悬浮字幕。</strong></p>
 
 <p align="center">
   <a href="README.md">English</a> ·
@@ -15,7 +15,7 @@
   <img src=".github/assets/demo.png" width="720" alt="OverLingo 在视频上方显示实时双语字幕">
 </p>
 
-OverLingo 把系统音频和麦克风里的语音，实时转成双语字幕，显示在一个小巧的桌面悬浮窗里。两条链路可以单独使用，也可以同时开启，适合看视频、听演讲、开多语言会议等场景。
+OverLingo 把系统音频和麦克风里的语音，实时转成双语字幕，显示在一个小巧的桌面悬浮窗里。两条链路可以单独使用，也可以同时开启，适合看视频、听演讲、开会议等各种场景。
 
 ## 下载
 
@@ -24,16 +24,36 @@ OverLingo 把系统音频和麦克风里的语音，实时转成双语字幕，�
 - macOS 14.4 及以上：Apple Silicon 与 Intel 版 DMG
 - Windows 11：x64 与 ARM64 版 NSIS 和 MSI 安装包
 
-首次使用时，macOS 会请求系统音频录制权限；如果开启麦克风链路，还会请求麦克风权限。
+首次使用时，macOS 会请求系统音频录制权限；如果启用麦克风链路，还会请求麦克风权限。
 
 ## 功能
 
-- **双路音频** —— 系统音频、麦克风，可同时开启
-- **双路字幕** —— 双路音频字幕可同时显示，原文、译文可自由开启
-- **macOS 单应用捕获** —— macOS 支持仅捕获指定应用音频
+- **双路音频双路字幕** —— 可自由开启系统音频和麦克风语音的原文、译文
+- **macOS 应用捕获** —— macOS 支持仅捕获指定应用的音频
 - **自定义悬浮窗** —— 置顶、尺寸、文字大小、透明度、显示/隐藏，均可自定义
-- **历史字幕** —— 可查看历史字幕，支持导出
+- **历史字幕** —— 可回看历史字幕，支持导出
 - **使用您自己的密钥** —— 密钥会被安全地保存在本地加密位置
+
+## 截图
+
+<table>
+  <tr>
+    <td width="50%"><img src=".github/assets/overlay-merged.png" alt="合并布局"></td>
+    <td width="50%"><img src=".github/assets/overlay-settings.png" alt="字幕设置"></td>
+  </tr>
+  <tr>
+    <td align="center">合并布局</td>
+    <td align="center">字幕设置</td>
+  </tr>
+  <tr>
+    <td><img src=".github/assets/main-history.png" alt="历史字幕"></td>
+    <td><img src=".github/assets/main-translators.png" alt="翻译器配置"></td>
+  </tr>
+  <tr>
+    <td align="center">历史字幕</td>
+    <td align="center">翻译器配置</td>
+  </tr>
+</table>
 
 ## 支持的服务商
 
