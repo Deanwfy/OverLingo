@@ -44,6 +44,9 @@ pub enum ControllerRequest {
     Capture {
         bundle_id: String,
     },
+    MicrophoneDevice {
+        device: String,
+    },
     RequestCaptureOptions,
     Exit,
 }
@@ -106,6 +109,7 @@ pub struct ControllerSnapshot {
 pub(super) struct CaptureSnapshot {
     pub(super) capabilities: CaptureCapabilities,
     pub(super) applications: Vec<CapturableApplication>,
+    pub(super) microphones: Vec<String>,
     pub(super) loading: bool,
 }
 

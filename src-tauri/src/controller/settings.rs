@@ -153,6 +153,20 @@ impl ControllerActor {
         self.publish();
     }
 
+    pub(super) fn update_microphone_device(&mut self, device: String) {
+        let microphone = &mut self.config.audio.microphone;
+        if device == "default" {
+            microphone.device = None;
+        } else if self.capture_microphones.iter().any(|name| name == &device) {
+            microphone.device = Some(device);
+        } else {
+            return;
+        }
+        self.save_config();
+        self.reconfigure_if_active();
+        self.publish();
+    }
+
     pub(super) fn load_capture_options(&mut self) {
         if self.capture_loading {
             return;
@@ -161,7 +175,8 @@ impl ControllerActor {
         self.publish();
         let sender = self.sender.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            let result = audio::list_capturable_applications();
+            let result = audio::list_capturable_applications()
+                .map(|applications| (applications, audio::list_input_devices()));
             let _ = sender.send(Action::CaptureOptionsLoaded(result));
         });
     }

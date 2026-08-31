@@ -16,7 +16,7 @@ impl MicCapture {
         Self { active: None }
     }
 
-    pub fn start(&mut self) -> Result<mpsc::Receiver<Vec<u8>>, String> {
+    pub fn start(&mut self, device: Option<&str>) -> Result<mpsc::Receiver<Vec<u8>>, String> {
         if self.active.is_some() {
             return Err("Already capturing".into());
         }
@@ -25,8 +25,9 @@ impl MicCapture {
         let (ready_sender, ready_receiver) = mpsc::sync_channel(1);
         let is_capturing = Arc::new(AtomicBool::new(true));
         let worker_flag = is_capturing.clone();
+        let device = device.map(str::to_string);
         std::thread::spawn(move || {
-            run_capture(audio_sender, worker_flag, ready_sender);
+            run_capture(device, audio_sender, worker_flag, ready_sender);
         });
 
         let outcome = match ready_receiver.recv_timeout(Duration::from_secs(5)) {
@@ -65,11 +66,12 @@ impl Default for MicCapture {
 }
 
 fn run_capture(
+    device_name: Option<String>,
     sender: mpsc::Sender<Vec<u8>>,
     is_capturing: Arc<AtomicBool>,
     ready: mpsc::SyncSender<Result<(), String>>,
 ) {
-    match build_stream(sender, is_capturing.clone()) {
+    match build_stream(device_name.as_deref(), sender, is_capturing.clone()) {
         Ok(stream) => {
             let _ = ready.send(Ok(()));
             while is_capturing.load(Ordering::SeqCst) {
@@ -85,6 +87,7 @@ fn run_capture(
 }
 
 fn build_stream(
+    device_name: Option<&str>,
     sender: mpsc::Sender<Vec<u8>>,
     is_capturing: Arc<AtomicBool>,
 ) -> Result<cpal::Stream, String> {
@@ -101,9 +104,26 @@ fn build_stream(
         return Err("No microphone found. Connect a microphone or headset.".into());
     }
 
-    let device = host
-        .default_input_device()
-        .ok_or("No default microphone found. Connect a microphone or headset.")?;
+    // A stored device may be unplugged; falling back to the default keeps the route
+    // alive instead of failing until the user reopens settings.
+    let device = device_name
+        .and_then(|name| {
+            let found = host.input_devices().ok().and_then(|mut devices| {
+                devices.find(|device| device.name().is_ok_and(|current| current == name))
+            });
+            if found.is_none() {
+                crate::diagnostics::log(
+                    "audio:microphone",
+                    format!("device_missing name={}", crate::diagnostics::field(name)),
+                );
+            }
+            found
+        })
+        .map(Ok)
+        .unwrap_or_else(|| {
+            host.default_input_device()
+                .ok_or("No default microphone found. Connect a microphone or headset.")
+        })?;
     let input_config = preferred_input_config(&device)?;
     let sample_rate = input_config.sample_rate().0;
     let channels = input_config.channels() as usize;

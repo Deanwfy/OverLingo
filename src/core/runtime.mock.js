@@ -56,7 +56,11 @@ export async function sendControllerAction(request) {
         case 'capture':
             updateCapture(state, request.bundleId);
             break;
+        case 'microphoneDevice':
+            state.audio.microphone.device = request.device === 'default' ? null : request.device;
+            break;
         case 'requestCaptureOptions':
+            state.capture.microphones = ['MacBook Pro Microphone', 'AirPods Pro'];
             state.capture.applications = [
                 { bundleId: 'us.zoom.xos', name: 'Zoom' },
                 { bundleId: 'com.apple.Safari', name: 'Safari' },
@@ -151,6 +155,7 @@ function snapshot() {
         capture: {
             capabilities: { applicationCapture: true },
             applications: [],
+            microphones: [],
             loading: false,
         },
         credentials: { qwen: true, openai: true },

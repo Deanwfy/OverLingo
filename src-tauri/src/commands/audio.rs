@@ -107,7 +107,9 @@ pub enum CaptureRequest {
         #[serde(rename = "applicationBundleId")]
         application_bundle_id: Option<String>,
     },
-    Microphone,
+    Microphone {
+        device: Option<String>,
+    },
 }
 
 struct ActiveCapture {
@@ -150,7 +152,7 @@ impl Worker {
     ) -> Result<(), String> {
         let source = match &capture {
             CaptureRequest::System { .. } => AudioSource::System,
-            CaptureRequest::Microphone => AudioSource::Microphone,
+            CaptureRequest::Microphone { .. } => AudioSource::Microphone,
         };
 
         self.stop(&route_id);
@@ -170,7 +172,7 @@ impl Worker {
             CaptureRequest::System {
                 application_bundle_id,
             } => self.system_audio.start(application_bundle_id.as_deref()),
-            CaptureRequest::Microphone => self.microphone.start(),
+            CaptureRequest::Microphone { device } => self.microphone.start(device.as_deref()),
         }
         .inspect_err(|error| {
             crate::diagnostics::log(
@@ -214,6 +216,14 @@ impl Worker {
             AudioSource::Microphone => self.microphone.stop(),
         }
     }
+}
+
+pub fn list_input_devices() -> Vec<String> {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    cpal::default_host()
+        .input_devices()
+        .map(|devices| devices.filter_map(|device| device.name().ok()).collect())
+        .unwrap_or_default()
 }
 
 pub fn list_capturable_applications() -> Result<Vec<CapturableApplication>, String> {

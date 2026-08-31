@@ -127,7 +127,7 @@ enum Action {
         token: u64,
         version: u64,
     },
-    CaptureOptionsLoaded(Result<Vec<CapturableApplication>, String>),
+    CaptureOptionsLoaded(Result<(Vec<CapturableApplication>, Vec<String>), String>),
     CredentialsChanged,
     Tick(u64),
 }
@@ -145,6 +145,7 @@ struct ControllerActor {
     routes: HashMap<String, ActiveRoute>,
     turns: HashMap<String, Vec<TranscriptTurn>>,
     capture_applications: Vec<CapturableApplication>,
+    capture_microphones: Vec<String>,
     capture_loading: bool,
     session_clock: SessionClock,
     journal: Option<Journal>,
@@ -173,6 +174,7 @@ impl ControllerActor {
             routes: HashMap::new(),
             turns: HashMap::new(),
             capture_applications: Vec::new(),
+            capture_microphones: Vec::new(),
             capture_loading: false,
             session_clock: SessionClock::default(),
             journal: None,
@@ -211,7 +213,10 @@ impl ControllerActor {
                 Action::CaptureOptionsLoaded(result) => {
                     self.capture_loading = false;
                     match result {
-                        Ok(applications) => self.capture_applications = applications,
+                        Ok((applications, microphones)) => {
+                            self.capture_applications = applications;
+                            self.capture_microphones = microphones;
+                        }
                         Err(error) => self.set_notice(None, error),
                     }
                     self.publish();
@@ -253,6 +258,7 @@ impl ControllerActor {
             ControllerRequest::QwenSettings { patch } => self.update_qwen_settings(patch),
             ControllerRequest::Locale { locale } => self.update_locale(&locale),
             ControllerRequest::Capture { bundle_id } => self.update_capture(bundle_id),
+            ControllerRequest::MicrophoneDevice { device } => self.update_microphone_device(device),
             ControllerRequest::RequestCaptureOptions => self.load_capture_options(),
             ControllerRequest::Exit => {
                 self.stop_translation();

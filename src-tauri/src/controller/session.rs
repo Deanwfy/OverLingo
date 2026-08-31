@@ -306,7 +306,9 @@ impl ControllerActor {
             return;
         };
         let capture = if route.config.input == MICROPHONE_ROUTE {
-            CaptureRequest::Microphone
+            CaptureRequest::Microphone {
+                device: self.config.audio.microphone.device.clone(),
+            }
         } else {
             CaptureRequest::System {
                 application_bundle_id: self.captured_application(),

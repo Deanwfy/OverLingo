@@ -15,6 +15,9 @@ export const DEFAULT_CONFIG: AppConfig = {
             scope: 'all',
             application: null,
         },
+        microphone: {
+            device: null,
+        },
     },
     routes: {
         system: {

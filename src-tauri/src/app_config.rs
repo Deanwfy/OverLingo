@@ -21,6 +21,14 @@ pub struct AppConfig {
 #[serde(default, rename_all = "camelCase")]
 pub struct AudioConfig {
     pub system: SystemAudioConfig,
+    pub microphone: MicrophoneConfig,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
+#[serde(default, rename_all = "camelCase")]
+pub struct MicrophoneConfig {
+    /// Capture device name; `None` follows the system default.
+    pub device: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -199,6 +207,10 @@ impl AppConfig {
         normalize_route(&mut self.routes.system, "system", interface);
         normalize_route(&mut self.routes.microphone, "microphone", interface);
         normalize_system_audio(&mut self.audio.system);
+        if let Some(device) = &self.audio.microphone.device {
+            let device = device.trim();
+            self.audio.microphone.device = (!device.is_empty()).then(|| device.to_string());
+        }
         self.qwen.workspace_id = self.qwen.workspace_id.trim().into();
         self.overlay.opacity = self.overlay.opacity.clamp(0.0, 1.0);
         self.overlay.font_scale = self.overlay.font_scale.clamp(0.75, 1.8);
@@ -310,6 +322,7 @@ mod tests {
         config.overlay.show_original = false;
         config.overlay.show_translation = false;
         config.overlay.layout = "stacked".into();
+        config.audio.microphone.device = Some("  ".into());
         config.normalize();
 
         assert_eq!(config.routes.system.input, "system");
@@ -317,6 +330,7 @@ mod tests {
         assert!(!config.overlay.show_original);
         assert!(config.overlay.show_translation);
         assert_eq!(config.overlay.layout, "split");
+        assert_eq!(config.audio.microphone.device, None);
     }
 
     #[test]

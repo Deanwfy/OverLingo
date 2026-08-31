@@ -32,6 +32,9 @@ export interface AppConfig {
             scope: 'all' | 'application';
             application: ApplicationReference | null;
         };
+        microphone: {
+            device: string | null;
+        };
     };
     routes: Record<RouteId, RouteConfig>;
     overlay: {
@@ -68,6 +71,7 @@ export type ControllerAction =
     | { type: 'qwenSettings'; patch: Partial<AppConfig['qwen']> }
     | { type: 'locale'; locale: LocaleSetting }
     | { type: 'capture'; bundleId: string }
+    | { type: 'microphoneDevice'; device: string }
     | { type: 'requestCaptureOptions' }
     | { type: 'translation'; command: 'start' | 'pause' | 'resume' | 'stop' }
     | { type: 'toggleTranslation' }
@@ -77,7 +81,7 @@ export type ControllerAction =
     | { type: 'exit' };
 
 export type OverlayAction = Extract<ControllerAction, {
-    type: 'settings' | 'route' | 'routeSettings' | 'retryRoute' | 'capture' | 'requestCaptureOptions' | 'translation' | 'hide';
+    type: 'settings' | 'route' | 'routeSettings' | 'retryRoute' | 'capture' | 'microphoneDevice' | 'requestCaptureOptions' | 'translation' | 'hide';
 }>;
 
 /// Keyed by provider id, so adding a translator needs no change here.
@@ -121,6 +125,7 @@ export interface ControllerSnapshot {
     capture: {
         capabilities: CaptureCapabilities;
         applications: ApplicationReference[];
+        microphones: string[];
         loading: boolean;
     };
     credentials: Credentials;

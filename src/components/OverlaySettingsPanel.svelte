@@ -129,6 +129,7 @@
         {#each routeIds as routeId}
             {@const route = state.routes[routeId].config}
             {@const selectedApplication = state.audio.system.application}
+            {@const selectedMicrophone = state.audio.microphone.device}
             <section
                 class="source-settings-card"
                 class:disabled={!route.enabled}
@@ -165,6 +166,25 @@
                             {/if}
                             {#each state.capture.applications as application}
                                 <option value={application.bundleId}>{application.name}</option>
+                            {/each}
+                        </select>
+                    </label>
+                {/if}
+
+                {#if routeId === 'microphone'}
+                    <label class="compact-select full-width">
+                        <span>{t('microphoneFrom')}</span>
+                        <select
+                            value={selectedMicrophone ?? 'default'}
+                            disabled={!route.enabled || state.capture.loading || starting}
+                            onchange={(event) => send({ type: 'microphoneDevice', device: event.currentTarget.value })}
+                        >
+                            <option value="default">{t('defaultMicrophone')}</option>
+                            {#if selectedMicrophone && !state.capture.microphones.includes(selectedMicrophone)}
+                                <option value={selectedMicrophone}>{selectedMicrophone} · {t('unavailable')}</option>
+                            {/if}
+                            {#each state.capture.microphones as microphone}
+                                <option value={microphone}>{microphone}</option>
                             {/each}
                         </select>
                     </label>

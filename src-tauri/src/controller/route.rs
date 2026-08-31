@@ -38,6 +38,7 @@ impl ProviderKey {
 pub(super) struct CaptureKey {
     input: String,
     application: Option<String>,
+    microphone_device: Option<String>,
 }
 
 impl CaptureKey {
@@ -53,9 +54,13 @@ impl CaptureKey {
                     .map(|application| application.bundle_id.clone())
             })
             .flatten();
+        let microphone_device = (route.input == "microphone")
+            .then(|| config.audio.microphone.device.clone())
+            .flatten();
         Self {
             input: route.input.clone(),
             application,
+            microphone_device,
         }
     }
 }
@@ -254,6 +259,22 @@ mod tests {
             ProviderKey::new(&changed, &changed.routes.system)
         );
         assert_ne!(
+            CaptureKey::new(&config, &config.routes.system),
+            CaptureKey::new(&changed, &changed.routes.system)
+        );
+    }
+
+    #[test]
+    fn microphone_device_only_rekeys_the_microphone_route() {
+        let config = AppConfig::default();
+        let mut changed = config.clone();
+        changed.audio.microphone.device = Some("USB Microphone".into());
+
+        assert_ne!(
+            CaptureKey::new(&config, &config.routes.microphone),
+            CaptureKey::new(&changed, &changed.routes.microphone)
+        );
+        assert_eq!(
             CaptureKey::new(&config, &config.routes.system),
             CaptureKey::new(&changed, &changed.routes.system)
         );
