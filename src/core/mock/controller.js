@@ -1,7 +1,7 @@
-import { DEFAULT_CONFIG } from '../app/defaults';
-import { formatDuration } from '../app/format';
-import { translator } from '../engines/registry.js';
-import { locale } from './i18n.js';
+import { DEFAULT_CONFIG } from '../../app/defaults';
+import { translator } from '../../engines/registry.js';
+import { locale } from '../i18n.js';
+import { readJson, writeJson } from './storage.js';
 
 const subscribers = new Map();
 let controllerState;
@@ -79,60 +79,6 @@ export async function sendControllerAction(request) {
     broadcast();
 }
 
-export async function invoke(command, args = {}) {
-    switch (command) {
-        case 'get_credential_status':
-            return readJson('overlingo-credentials') || { qwen: true, openai: false };
-        case 'set_provider_credential': {
-            const status = readJson('overlingo-credentials') || { qwen: false, openai: false };
-            status[args.provider] = Boolean(args.secret?.trim());
-            writeJson('overlingo-credentials', status);
-            return status;
-        }
-        case 'list_sessions':
-            return sessionList();
-        case 'read_session': {
-            const session = (readJson('overlingo-sessions') || {})[args.id];
-            if (!session) throw new Error('Session not found');
-            return session;
-        }
-        case 'rename_session': {
-            const sessions = readJson('overlingo-sessions') || {};
-            const session = sessions[args.id];
-            if (!session) throw new Error('Session not found');
-            session.json.title = args.title;
-            session.md = renderMarkdown(session.json, 'both');
-            writeJson('overlingo-sessions', sessions);
-            return null;
-        }
-        case 'export_session': {
-            const session = (readJson('overlingo-sessions') || {})[args.id];
-            if (!session) throw new Error('Session not found');
-            downloadFile(
-                `${session.json.title}.txt`,
-                renderTranscript(session.json, args.mode, args.labels),
-            );
-            return true;
-        }
-        case 'delete_session': {
-            const sessions = readJson('overlingo-sessions') || {};
-            delete sessions[args.id];
-            writeJson('overlingo-sessions', sessions);
-            return null;
-        }
-        default:
-            throw new Error(`Unsupported browser command: ${command}`);
-    }
-}
-
-export async function getAutostartEnabled() {
-    return localStorage.getItem('overlingo-autostart') === 'true';
-}
-
-export async function setAutostartEnabled(enabled) {
-    localStorage.setItem('overlingo-autostart', String(enabled));
-}
-
 function snapshot() {
     if (controllerState) return controllerState;
     const config = readJson('overlingo-config') || structuredClone(DEFAULT_CONFIG);
@@ -171,7 +117,7 @@ function snapshot() {
 function setTranslation(command) {
     const state = snapshot();
     if (command === 'stop' || command === 'pause') {
-        timers.forEach(clearTimeout);
+        timers.forEach(clearInterval);
         timers = [];
         state.translationState = command === 'pause' ? 'paused' : 'stopped';
         broadcast();
@@ -179,34 +125,61 @@ function setTranslation(command) {
     }
     if (command === 'resume') {
         state.translationState = 'running';
+        tickElapsed(state);
     } else if (command === 'start') {
         state.translationState = 'starting';
         state.overlayVisible = true;
         state.config.enabled = true;
+        state.elapsedSeconds = 0;
         timers.push(setTimeout(() => {
             state.translationState = 'running';
             broadcast();
         }, 180));
-        queueTurn('system', 700,
-            'Thanks for joining. Let us review the launch plan.',
-            '感谢大家参加。我们来确认一下发布计划。');
-        queueTurn('microphone', 1100,
-            '好的，我稍后发送最终时间表。',
-            'Okay, I will send the final timeline shortly.');
+        tickElapsed(state);
+        for (const turn of DEMO_TURNS) queueTurn(...turn);
     }
     broadcast();
 }
 
-function queueTurn(routeId, delay, original, translation) {
+function tickElapsed(state) {
+    timers.push(setInterval(() => {
+        state.elapsedSeconds += 1;
+        broadcast();
+    }, 1000));
+}
+
+// A two-way meeting: the other side over system audio, the user on the microphone.
+const DEMO_TURNS = [
+    ['system', 700, {
+        en: 'Thanks for joining. Let us review the launch plan.',
+        zh: '感谢大家参加。我们来确认一下发布计划。',
+    }],
+    ['microphone', 1500, {
+        en: 'Okay, I will send the final timeline shortly.',
+        zh: '好的，我稍后发送最终时间表。',
+    }],
+    ['system', 2300, {
+        en: 'Great. Can we ship the beta next Friday?',
+        zh: '很好。测试版下周五能发布吗？',
+    }],
+    ['microphone', 3100, {
+        en: 'Yes, once external testing is done.',
+        zh: '可以，等外部测试完成就发。',
+    }],
+];
+
+function queueTurn(routeId, delay, text) {
     timers.push(setTimeout(() => {
         const state = snapshot();
-        state.routes[routeId].turns.push({
+        const route = state.routes[routeId];
+        const speaks = language => text[language] ?? text.en;
+        route.turns.push({
             type: 'turn',
             routeId,
-            original,
-            translation,
+            original: speaks(route.config.sourceLanguage),
+            translation: speaks(route.config.targetLanguage),
             timestamp: new Date().toISOString(),
-            ...state.routes[routeId].config,
+            ...route.config,
         });
         broadcast();
     }, delay));
@@ -232,66 +205,7 @@ function persistConfig(state) {
     });
 }
 
-function sessionList() {
-    const sessions = Object.values(readJson('overlingo-sessions') || {});
-    return sessions.map(({ json }) => ({
-        id: json.id,
-        title: json.title,
-        created_at: json.created_at,
-        duration_sec: json.duration_sec,
-    })).sort((a, b) => b.created_at.localeCompare(a.created_at));
-}
-
-function renderMarkdown(data, mode) {
-    const lines = [`# ${data.title}`, '', data.created_at, ''];
-    for (const segment of data.chunks.flatMap(chunk => chunk.segments)) {
-        const source = mode === 'target' ? '' : segment.src;
-        const target = mode === 'source' ? '' : segment.tgt;
-        if (!source && !target) continue;
-        lines.push(`## ${segment.ts} · ${segment.route_id}`, '');
-        if (source) lines.push(`**${segment.source_lang}**  ${source}`);
-        if (target) lines.push(`**${segment.target_lang}**  ${target}`);
-        lines.push('');
-    }
-    return lines.join('\n');
-}
-
-function renderTranscript(data, mode, labels = {}) {
-    const lines = [data.title, `${data.created_at} · ${formatDuration(data.duration_sec)}`, ''];
-    for (const segment of data.chunks.flatMap(chunk => chunk.segments)) {
-        const source = mode === 'target' ? '' : segment.src;
-        const target = mode === 'source' ? '' : segment.tgt;
-        if (!source && !target) continue;
-        lines.push(`[${segment.ts}] ${labels[segment.route_id] || segment.route_id}`);
-        if (source) lines.push(source);
-        if (target) lines.push(target);
-        lines.push('');
-    }
-    return lines.join('\n');
-}
-
-function downloadFile(name, content) {
-    const url = URL.createObjectURL(new Blob([content], { type: 'text/markdown' }));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = name;
-    link.click();
-    URL.revokeObjectURL(url);
-}
-
 function broadcast() {
     const state = structuredClone(snapshot());
     for (const handler of subscribers.values()) handler(state);
-}
-
-function readJson(key) {
-    try {
-        return JSON.parse(localStorage.getItem(key) || 'null');
-    } catch {
-        return null;
-    }
-}
-
-function writeJson(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
 }

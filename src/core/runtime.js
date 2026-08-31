@@ -5,16 +5,16 @@ import {
     enable as enableAutostart,
     isEnabled as isAutostartEnabled,
 } from '@tauri-apps/plugin-autostart';
-import * as mock from './runtime.mock.js';
-
 const native = isTauri();
+// The browser preview's fake backend only exists in dev builds; production builds drop it.
+const mock = !native && import.meta.env.DEV ? import('./mock/index.js') : null;
 
-export function invoke(command, args = {}) {
-    return native ? invokeNative(command, args) : mock.invoke(command, args);
+export async function invoke(command, args = {}) {
+    return native ? invokeNative(command, args) : (await mock).invoke(command, args);
 }
 
 export async function subscribeController(surface, handler) {
-    if (!native) return mock.subscribeController(surface, handler);
+    if (!native) return (await mock).subscribeController(surface, handler);
     const channel = new Channel();
     channel.onmessage = handler;
     await invokeNative('subscribe_controller', { surface, onEvent: channel });
@@ -23,10 +23,10 @@ export async function subscribeController(surface, handler) {
     };
 }
 
-export function sendControllerAction(request) {
+export async function sendControllerAction(request) {
     return native
         ? invokeNative('controller_action', { request })
-        : mock.sendControllerAction(request);
+        : (await mock).sendControllerAction(request);
 }
 
 export async function showSettingsWindow() {
@@ -59,12 +59,12 @@ export async function openExternal(url) {
     else window.open(url, '_blank', 'noopener');
 }
 
-export function getAutostartEnabled() {
-    return native ? isAutostartEnabled() : mock.getAutostartEnabled();
+export async function getAutostartEnabled() {
+    return native ? isAutostartEnabled() : (await mock).getAutostartEnabled();
 }
 
 export async function setAutostartEnabled(enabled) {
-    if (!native) return mock.setAutostartEnabled(enabled);
+    if (!native) return (await mock).setAutostartEnabled(enabled);
     if (enabled) await enableAutostart();
     else await disableAutostart();
 }
