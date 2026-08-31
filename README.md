@@ -55,6 +55,8 @@ npm test
 npm run dev
 ```
 
+On macOS, `export APPLE_SIGNING_IDENTITY="Apple Development: Your Name (TEAMID1234)"` signs dev builds.
+
 Release bundles:
 
 ```bash

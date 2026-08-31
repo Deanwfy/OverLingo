@@ -1,0 +1,4 @@
+# `tauri dev` runs the bare binary through `cargo run`; the runner signs it first so
+# Keychain and TCC keep recognising the app across rebuilds. See scripts/dev-runner.sh.
+[target.'cfg(target_os = "macos")']
+runner = "scripts/dev-runner.sh"

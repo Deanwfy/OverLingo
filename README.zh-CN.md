@@ -55,6 +55,8 @@ npm test
 npm run dev
 ```
 
+macOS 上，可通过 `export APPLE_SIGNING_IDENTITY="Apple Development: Your Name (TEAMID1234)"` 为开发版签名。
+
 构建发布包：
 
 ```bash
