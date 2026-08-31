@@ -4,27 +4,24 @@
 header = """
 # Changelog
 
-All notable changes to OverLingo are documented in this file.
-
-"""
+All notable changes to OverLingo are documented in this file."""
 body = """
-{% if version %}\
-    {% if previous.version %}\
+{%- if version %}
+{%- if previous.version %}
 ## [{{ version | trim_start_matches(pat="v") }}](https://github.com/Deanwfy/OverLingo/compare/{{ previous.version }}...{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
-    {% else %}\
+{%- else %}
 ## [{{ version | trim_start_matches(pat="v") }}](https://github.com/Deanwfy/OverLingo/releases/tag/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
-    {% endif %}\
-{% else %}\
+{%- endif %}
+{%- else %}
 ## [Unreleased]
-{% endif %}\
+{%- endif %}
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group | striptags | trim }}
 {% for commit in commits %}
-- {{ commit.message | upper_first }}\
-{% endfor %}
-{% endfor %}
-"""
-trim = true
+- {{ commit.message | upper_first }}
+{%- endfor %}
+{% endfor %}"""
+trim = false
 
 [git]
 conventional_commits = true
