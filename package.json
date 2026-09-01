@@ -2,7 +2,7 @@
   "name": "overlingo",
   "private": true,
   "version": "1.1.0",
-  "description": "Live bilingual subtitles over any app",
+  "description": "Live two-way translation overlay",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Deanwfy/OverLingo.git"

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OverLingo — Live two-way translation overlay</title>
+<meta name="description" content="Live two-way translation overlay">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://deanwfy.github.io/OverLingo/">
+<meta property="og:title" content="OverLingo">
+<meta property="og:description" content="Live two-way translation overlay">
+<meta property="og:image" content="https://deanwfy.github.io/OverLingo/assets/social.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#1d1e22" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<div class="top">
+<header class="nav">
+  <nav>
+    <a class="github" href="https://github.com/Deanwfy/OverLingo" aria-label="GitHub"><svg width="22" height="22" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+    <button class="lang-toggle" type="button" id="lang-toggle" aria-label="Switch language">
+      <span data-pick="en">EN</span><span class="sep">/</span><span data-pick="zh">中</span>
+    </button>
+  </nav>
+</header>
+
+  <section class="hero">
+    <h1><img src="icon.svg" width="96" height="96" alt="">OverLingo</h1>
+    <p class="lead t">
+      <span lang="en">Live two-way translation overlay</span>
+      <span lang="zh-Hans">实时双向翻译字幕</span>
+    </p>
+
+    <div class="download" id="download">
+      <a class="primary" id="dl-primary" href="https://github.com/Deanwfy/OverLingo/releases/latest">
+        <span class="t"><span lang="en">Download</span><span lang="zh-Hans">下载</span></span>
+        <span id="dl-primary-label"></span>
+      </a>
+      <div class="meta">
+        <div>
+          <span id="dl-version"></span>
+          <details class="others">
+            <summary class="t"><span lang="en">Other platforms</span><span lang="zh-Hans">其他平台</span></summary>
+            <div class="others-list" id="dl-alts"></div>
+          </details>
+        </div>
+        <div>macOS 14.4+ · Windows 11</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+  <section class="demo" aria-label="OverLingo overlay demo">
+    <video id="demo" autoplay muted loop playsinline width="1720" height="720" poster="assets/demo-poster.png">
+      <source src="assets/demo.webm" type="video/webm">
+      <source src="assets/demo.mov" type='video/mp4; codecs="hvc1"'>
+    </video>
+  </section>
+
+<main>
+  <section class="rows">
+    <div class="row">
+      <figure class="shot"><img src="assets/video.png" width="1520" height="500" loading="lazy" alt="The overlay translating a Chinese video into English"></figure>
+      <div>
+        <h2 class="sub"><span lang="en">Watching a video</span><span lang="zh-Hans">看视频</span></h2>
+        <p class="t">
+          <span lang="en">A foreign video with no subtitles? Turn on OverLingo and show the original, the translation, or both.</span>
+          <span lang="zh-Hans">外语视频没字幕？打开 OverLingo，原文译文任意显示。</span>
+        </p>
+      </div>
+    </div>
+    <div class="row">
+      <figure class="shot"><img src="assets/overlay-merged.png" width="1520" height="500" loading="lazy" alt="The overlay in merged layout during a meeting"></figure>
+      <div>
+        <h2 class="sub"><span lang="en">In a meeting</span><span lang="zh-Hans">开会</span></h2>
+        <p class="t">
+          <span lang="en">Speak your own language. Two-way subtitles, in a split or merged layout.</span>
+          <span lang="zh-Hans">直接使用母语交流，使用分栏或合并模式，显示双向翻译字幕。</span>
+        </p>
+      </div>
+    </div>
+    <div class="row">
+      <figure class="shot"><img src="assets/main-history.png" width="1960" height="1300" loading="lazy" alt="The history view listing past sessions"></figure>
+      <div>
+        <h2 class="sub"><span lang="en">History</span><span lang="zh-Hans">历史</span></h2>
+        <p class="t">
+          <span lang="en">The original and translation of every session are saved on this machine. Export or delete them any time.</span>
+          <span lang="zh-Hans">每次会话的原文译文都会保存在本机。可随时导出或删除。</span>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="how">
+    <h2 class="sub"><span lang="en">Three steps</span><span lang="zh-Hans">三步开始</span></h2>
+    <ol>
+      <li>
+        <div>
+        <h3 class="sub"><span lang="en">Add a key</span><span lang="zh-Hans">填写密钥</span></h3>
+        <p class="t">
+          <span lang="en">Works with <a href="https://www.alibabacloud.com/help/en/model-studio/qwen3-5-livetranslate-flash-realtime">Alibaba Cloud Model Studio</a>, <a href="https://developers.openai.com/api/docs/guides/realtime-translation">OpenAI</a>, and <a href="https://soniox.com/docs/translation/stt-translation/rt-translation">Soniox</a>.</span>
+          <span lang="zh-Hans">支持<a href="https://help.aliyun.com/zh/model-studio/qwen3-5-livetranslate-flash-realtime">阿里云百炼</a>、<a href="https://developers.openai.com/api/docs/guides/realtime-translation">OpenAI</a>、<a href="https://soniox.com/docs/translation/stt-translation/rt-translation">Soniox</a>。</span>
+        </p>
+        </div>
+        <figure class="shot"><img src="assets/main-translators.png" width="1960" height="1300" loading="lazy" alt="Translator setup with an API key field"></figure>
+      </li>
+      <li>
+        <div>
+        <h3 class="sub"><span lang="en">Pick what to capture</span><span lang="zh-Hans">选择捕获对象</span></h3>
+        <p class="t">
+          <span lang="en">Capture system audio and the microphone at the same time. On macOS you can even capture a single app, such as Zoom. Plenty of subtitle options to tweak, too.</span>
+          <span lang="zh-Hans">可同时捕获系统音频和麦克风，在 macOS 上甚至可以单独捕获 Zoom 等应用。还有丰富的字幕配置选项。</span>
+        </p>
+        </div>
+        <figure class="shot"><img src="assets/overlay-settings.png" width="2160" height="1160" loading="lazy" alt="The overlay settings panel choosing an app and a microphone"></figure>
+      </li>
+      <li>
+        <div>
+        <h3 class="sub"><span lang="en">Start!</span><span lang="zh-Hans">启动！</span></h3>
+        <p class="t">
+          <span lang="en">That's it — enjoy.</span>
+          <span lang="zh-Hans">大功告成，尽情享用。</span>
+        </p>
+        </div>
+        <figure class="shot"><img src="assets/start.png" width="1520" height="500" loading="lazy" alt="The overlay showing subtitles"></figure>
+      </li>
+    </ol>
+  </section>
+
+  <section class="facts">
+    <p class="t">
+      <span lang="en">Lightweight. No account, no telemetry, no relay server. Open source under the MIT license.</span>
+      <span lang="zh-Hans">轻量。无账号、无遥测、无中转服务器。MIT 协议开源。</span>
+    </p>
+  </section>
+
+  <section class="faq">
+    <h2 class="sub"><span lang="en">Questions</span><span lang="zh-Hans">常见问题</span></h2>
+    <dl>
+      <div>
+        <dt class="t"><span lang="en">Does it need the internet?</span><span lang="zh-Hans">需要联网吗？</span></dt>
+        <dd class="t"><span lang="en">Yes. Only online translation providers are supported for now.</span><span lang="zh-Hans">需要。目前仅支持在线翻译服务商。</span></dd>
+      </div>
+      <div>
+        <dt class="t"><span lang="en">Does it cost anything?</span><span lang="zh-Hans">需要付费吗？</span></dt>
+        <dd class="t"><span lang="en">The app is completely free. Translation uses your own key and is billed at the provider's rates.</span><span lang="zh-Hans">应用完全免费。翻译服务使用你自己的密钥，按照服务商的价格计费。</span></dd>
+      </div>
+      <div>
+        <dt class="t"><span lang="en">Which languages can it translate?</span><span lang="zh-Hans">翻译支持哪些语言？</span></dt>
+        <dd class="t"><span lang="en">Chinese, English, Japanese, Korean, Spanish, French, German, Vietnamese, and more. It depends on the provider.</span><span lang="zh-Hans">包括中、英、日、韩、西、法、德、越南语等。具体取决于服务商。</span></dd>
+      </div>
+      <div>
+        <dt class="t"><span lang="en">Does Windows support capturing a single app?</span><span lang="zh-Hans">Windows 平台支持捕获指定应用吗？</span></dt>
+        <dd class="t"><span lang="en">Not yet.</span><span lang="zh-Hans">暂不支持。</span></dd>
+      </div>
+      <div>
+        <dt class="t"><span lang="en">Is my audio saved?</span><span lang="zh-Hans">音频会被保存吗？</span></dt>
+        <dd class="t"><span lang="en">No. The subtitle text is saved on this machine, where you can view, export, or delete it any time.</span><span lang="zh-Hans">不会。字幕文本会被保存在本机，可以随时查看、导出和删除。</span></dd>
+      </div>
+      <div>
+        <dt class="t"><span lang="en">What permissions does it need?</span><span lang="zh-Hans">需要什么权限？</span></dt>
+        <dd class="t"><span lang="en">System audio recording and microphone access.</span><span lang="zh-Hans">系统音频录制权限和麦克风权限。</span></dd>
+      </div>
+    </dl>
+  </section>
+</main>
+
+<footer>
+  <p class="t">
+    <span lang="en">Open source under the MIT license. Based on <a href="https://github.com/phuc-nt/my-translator">My Translator</a> by Trọng Phúc.</span>
+    <span lang="zh-Hans">MIT 协议开源。基于 Trọng Phúc 的 <a href="https://github.com/phuc-nt/my-translator">My Translator</a>。</span>
+  </p>
+  <p><a href="https://github.com/Deanwfy/OverLingo">GitHub</a> · <a href="https://github.com/Deanwfy/OverLingo/releases">Releases</a> · <a href="https://github.com/Deanwfy/OverLingo/blob/main/CHANGELOG.md">Changelog</a></p>
+</footer>
+
+<script src="site.js"></script>
+</body>
+</html>

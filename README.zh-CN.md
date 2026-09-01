@@ -4,7 +4,7 @@
 
 <h1 align="center">OverLingo</h1>
 
-<p align="center"><strong>实时双向悬浮字幕。</strong></p>
+<p align="center"><strong>实时双向翻译字幕。</strong></p>
 
 <p align="center">
   <a href="README.md">English</a> ·
@@ -12,10 +12,10 @@
 </p>
 
 <p align="center">
-  <img src=".github/assets/demo.png" width="720" alt="OverLingo 在视频上方显示实时双语字幕">
+  <img src=".github/assets/demo.webp" width="720" alt="OverLingo 实时双向翻译字幕">
 </p>
 
-OverLingo 把系统音频和麦克风里的语音，实时转成双语字幕，显示在一个小巧的桌面悬浮窗里。两条链路可以单独使用，也可以同时开启，适合看视频、听演讲、开会议等各种场景。
+捕获系统音频和麦克风，实时显示双向翻译字幕。适合看视频、听演讲、开会议等各种场景。
 
 ## 下载
 

@@ -1,6 +1,7 @@
 import { DEFAULT_CONFIG } from '../../app/defaults';
 import { translator } from '../../engines/registry.js';
 import { locale } from '../i18n.js';
+import { saveSession } from './commands.js';
 import { readJson, writeJson } from './storage.js';
 
 const subscribers = new Map();
@@ -10,8 +11,22 @@ let timers = [];
 export async function subscribeController(surface, handler) {
     subscribers.set(surface, handler);
     handler(structuredClone(snapshot()));
+    // `?autostart` lets scripts/record-demo.mjs open the overlay straight into the demo.
+    if (!autostarted && demoParams().has('autostart')) {
+        autostarted = true;
+        setTranslation('start');
+    }
     return () => subscribers.delete(surface);
 }
+
+const demoParams = () => new URLSearchParams(location.search);
+// `?scene=video` plays a single-route scene; anything else is the two-way meeting.
+const demoScene = () => (demoParams().get('scene') === 'video' ? 'video' : 'meeting');
+// `?layout=merged` shows both routes on one timeline for this load only.
+const demoLayout = () => (demoParams().get('layout') === 'merged' ? 'merged' : null);
+// `?speed=0.25` slows the demo so every frame can be captured; timing is scaled back on encode.
+const demoSpeed = () => Number(demoParams().get('speed')) || 1;
+let autostarted = false;
 
 export async function sendControllerAction(request) {
     const state = snapshot();
@@ -60,11 +75,7 @@ export async function sendControllerAction(request) {
             state.audio.microphone.device = request.device === 'default' ? null : request.device;
             break;
         case 'requestCaptureOptions':
-            state.capture.microphones = ['MacBook Pro Microphone', 'AirPods Pro'];
-            state.capture.applications = [
-                { bundleId: 'us.zoom.xos', name: 'Zoom' },
-                { bundleId: 'com.apple.Safari', name: 'Safari' },
-            ];
+            Object.assign(state.capture, structuredClone(CAPTURE));
             break;
         case 'toggleTranslation':
             setTranslation(['starting', 'running', 'paused'].includes(state.translationState) ? 'stop' : 'start');
@@ -79,6 +90,14 @@ export async function sendControllerAction(request) {
     broadcast();
 }
 
+const CAPTURE = {
+    applications: [
+        { bundleId: 'us.zoom.xos', name: 'Zoom' },
+        { bundleId: 'com.apple.Safari', name: 'Safari' },
+    ],
+    microphones: ['MacBook Pro Microphone', 'AirPods Pro'],
+};
+
 function snapshot() {
     if (controllerState) return controllerState;
     const config = readJson('overlingo-config') || structuredClone(DEFAULT_CONFIG);
@@ -89,6 +108,9 @@ function snapshot() {
         turns: [],
         draft: { original: '', translation: '' },
     });
+    if (demoScene() === 'video') config.routes.microphone.enabled = false;
+    if (demoLayout()) config.overlay.layout = demoLayout();
+    const demo = demoParams().has('autostart');
     controllerState = {
         locale: config.locale === 'auto' ? locale() : config.locale,
         preferredLocale: config.locale,
@@ -96,14 +118,12 @@ function snapshot() {
         elapsedSeconds: 0,
         overlayVisible: true,
         config: structuredClone(config.overlay),
-        audio: structuredClone(config.audio),
+        // The demo listens to Zoom through AirPods, so the settings panel has something to show.
+        audio: demo
+            ? { system: { scope: 'application', application: CAPTURE.applications[0] }, microphone: { device: CAPTURE.microphones[1] } }
+            : structuredClone(config.audio),
         qwen: structuredClone(config.qwen),
-        capture: {
-            capabilities: { applicationCapture: true },
-            applications: [],
-            microphones: [],
-            loading: false,
-        },
+        capture: { capabilities: { applicationCapture: true }, applications: [], microphones: [], loading: false },
         credentials: { qwen: true, openai: true },
         routes: {
             system: route('system'),
@@ -119,7 +139,15 @@ function setTranslation(command) {
     if (command === 'stop' || command === 'pause') {
         timers.forEach(clearInterval);
         timers = [];
+        demoRun += 1;
         state.translationState = command === 'pause' ? 'paused' : 'stopped';
+        if (command === 'stop') {
+            saveSession(state, demoParams().has('autostart') ? SCENE_TITLES[demoScene()] : null);
+            for (const route of Object.values(state.routes)) {
+                route.turns = [];
+                route.draft = { original: '', translation: '' };
+            }
+        }
         broadcast();
         return;
     }
@@ -131,12 +159,13 @@ function setTranslation(command) {
         state.overlayVisible = true;
         state.config.enabled = true;
         state.elapsedSeconds = 0;
+        state.startedAt = new Date().toISOString();
         timers.push(setTimeout(() => {
             state.translationState = 'running';
             broadcast();
         }, 180));
         tickElapsed(state);
-        for (const turn of DEMO_TURNS) queueTurn(...turn);
+        playDemo(state);
     }
     broadcast();
 }
@@ -145,44 +174,97 @@ function tickElapsed(state) {
     timers.push(setInterval(() => {
         state.elapsedSeconds += 1;
         broadcast();
-    }, 1000));
+    }, 1000 / demoSpeed()));
 }
 
-// A two-way meeting: the other side over system audio, the user on the microphone.
-const DEMO_TURNS = [
-    ['system', 700, {
-        en: 'Thanks for joining. Let us review the launch plan.',
-        zh: '感谢大家参加。我们来确认一下发布计划。',
-    }],
-    ['microphone', 1500, {
-        en: 'Okay, I will send the final timeline shortly.',
-        zh: '好的，我稍后发送最终时间表。',
-    }],
-    ['system', 2300, {
-        en: 'Great. Can we ship the beta next Friday?',
-        zh: '很好。测试版下周五能发布吗？',
-    }],
-    ['microphone', 3100, {
-        en: 'Yes, once external testing is done.',
-        zh: '可以，等外部测试完成就发。',
-    }],
-];
+// Sessions the demo saves get a name instead of the timestamp the app would use.
+const SCENE_TITLES = { meeting: 'Launch timeline sync', video: 'Lip-sync video' };
 
-function queueTurn(routeId, delay, text) {
-    timers.push(setTimeout(() => {
-        const state = snapshot();
+// Each route picks its original from its source language and its translation from its target.
+const DEMO_SCENES = {
+    // A two-way meeting: the other side over system audio, the user on the microphone.
+    meeting: [
+        ['system', {
+            en: "Thanks for joining. Let's go over the launch timeline.",
+            zh: '感谢参加。我们过一下发布时间线。',
+        }],
+        ['system', {
+            en: "We're aiming for the beta next Friday, if QA signs off.",
+            zh: '如果 QA 通过，我们计划下周五发 beta。',
+        }],
+        ['microphone', {
+            en: 'Sure, the translations will be done this week.',
+            zh: '可以，翻译这周就能交。',
+        }],
+        ['system', {
+            en: 'Can your side have the localized strings ready by then?',
+            zh: '你们那边能在那之前把本地化文案准备好吗？',
+        }],
+        ['microphone', {
+            en: "The strings are fine. But the font license isn't confirmed yet, it may take another two days.",
+            zh: '文案没问题。但字体授权还没确认，可能要再等两天。',
+        }],
+        ['system', {
+            en: "Okay, let's lock the date and revisit the font on Wednesday.",
+            zh: '好，那先定下日期，字体的事周三再看。',
+        }],
+    ],
+    // A video with no subtitles, system audio only.
+    video: [
+        ['system', {
+            en: "You've probably seen this online: why does it always feel like the voice doesn't match the mouth when someone on screen is talking?",
+            zh: '在互联网上你应该多多少少看过这样的，为什么总感觉屏幕里这个人说话的时候他的声音和嘴对不上？',
+        }],
+        ['system', {
+            en: 'Everyone has wondered about this. So in this video we looked into it properly.',
+            zh: '所有人都有这个疑惑。所以这个视频我们认真地调研了一下。',
+        }],
+    ],
+};
+
+let demoRun = 0;
+const wait = ms => new Promise(resolve => timers.push(setTimeout(resolve, ms / demoSpeed())));
+const isCjk = text => /[㐀-鿿]/.test(text);
+// Roughly how the providers stream: Latin text by word, CJK by short runs of characters.
+const pieces = text => (isCjk(text) ? text.match(/.{1,3}/g) : text.split(/(?<=\s)/));
+
+async function playDemo(state) {
+    const run = ++demoRun;
+    await wait(1500);
+    for (const [routeId, text] of DEMO_SCENES[demoScene()]) {
+        if (run !== demoRun) return;
         const route = state.routes[routeId];
         const speaks = language => text[language] ?? text.en;
+        const original = speaks(route.config.sourceLanguage);
+        const translation = speaks(route.config.targetLanguage);
+        const latin = !isCjk(original);
+        for (const piece of pieces(original)) {
+            route.draft.original += piece;
+            broadcast();
+            await wait(latin ? 110 : 140);
+        }
+        await wait(350);
+        for (const piece of pieces(translation)) {
+            route.draft.translation += piece;
+            broadcast();
+            await wait(latin ? 90 : 60);
+        }
+        if (run !== demoRun) return;
         route.turns.push({
             type: 'turn',
             routeId,
-            original: speaks(route.config.sourceLanguage),
-            translation: speaks(route.config.targetLanguage),
+            original,
+            translation,
             timestamp: new Date().toISOString(),
+            elapsed: state.elapsedSeconds,
             ...route.config,
         });
+        route.draft = { original: '', translation: '' };
         broadcast();
-    }, delay));
+        await wait(900);
+    }
+    await wait(4000);
+    if (run === demoRun) document.documentElement.dataset.demoFinished = 'true';
 }
 
 function updateCapture(state, bundleId) {

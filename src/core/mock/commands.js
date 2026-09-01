@@ -55,6 +55,61 @@ export async function setAutostartEnabled(enabled) {
     localStorage.setItem('overlingo-autostart', String(enabled));
 }
 
+// Writes what the Rust side would after a stop: the session JSON and its Markdown twin.
+export function saveSession(state, title) {
+    const turns = Object.values(state.routes)
+        .flatMap(route => route.turns)
+        .sort((a, b) => a.elapsed - b.elapsed);
+    if (!turns.length) return;
+    const now = new Date().toISOString();
+    const label = seconds => [seconds / 3600, seconds % 3600 / 60, seconds % 60]
+        .map(part => String(Math.floor(part)).padStart(2, '0')).join(':');
+    const routes = Object.entries(state.routes)
+        .filter(([, route]) => route.config.enabled !== false)
+        .map(([id, route]) => ({
+            id,
+            input: route.config.input,
+            engine: route.config.engine,
+            model: route.config.model,
+            source_lang: route.config.sourceLanguage,
+            target_lang: route.config.targetLanguage,
+        }));
+    const json = {
+        schema_version: 1,
+        id: crypto.randomUUID(),
+        created_at: state.startedAt || now,
+        ended_at: now,
+        title: title || localTimestamp(state.startedAt || now),
+        engine: routes[0]?.engine ?? '',
+        source_lang: routes[0]?.source_lang ?? '',
+        target_lang: routes[0]?.target_lang ?? '',
+        duration_sec: state.elapsedSeconds,
+        routes,
+        chunks: [{
+            started_at: state.startedAt || now,
+            ended_at: now,
+            segments: turns.map(turn => ({
+                ts: label(turn.elapsed),
+                src: turn.original,
+                tgt: turn.translation,
+                route_id: turn.routeId,
+                engine: turn.engine,
+                source_lang: turn.sourceLanguage,
+                target_lang: turn.targetLanguage,
+            })),
+        }],
+    };
+    const sessions = readJson('overlingo-sessions') || {};
+    sessions[json.id] = { json, md: renderMarkdown(json, 'both') };
+    writeJson('overlingo-sessions', sessions);
+}
+
+function localTimestamp(iso) {
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function sessionList() {
     const sessions = Object.values(readJson('overlingo-sessions') || {});
     return sessions.map(({ json }) => ({

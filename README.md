@@ -4,7 +4,7 @@
 
 <h1 align="center">OverLingo</h1>
 
-<p align="center"><strong>Live two-way subtitle overlay.</strong></p>
+<p align="center"><strong>Live two-way translation overlay.</strong></p>
 
 <p align="center">
   English ·
@@ -12,10 +12,10 @@
 </p>
 
 <p align="center">
-  <img src=".github/assets/demo.png" width="720" alt="OverLingo showing live bilingual subtitles over a video">
+  <img src=".github/assets/demo.webp" width="720" alt="OverLingo live two-way translation overlay">
 </p>
 
-OverLingo turns system audio and microphone speech into live bilingual subtitles in a compact desktop overlay. Use either route independently or both together for videos, presentations, meetings, and more.
+Captures system audio and the microphone and shows live two-way translated subtitles. Good for videos, talks, meetings, and more.
 
 ## Download
 
