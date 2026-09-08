@@ -182,60 +182,9 @@
         await sendControllerAction({ type: 'hide' });
     }
 
-    function fitKey(...ids: RouteId[]) {
-        if (!overlayState) return '';
-        const routes = ids.map(routeId => overlayState!.routes[routeId]);
-        return [
-            overlayState.config.fontScale,
-            overlayState.config.showOriginal,
-            overlayState.config.showTranslation,
-            ...routes.flatMap(route => [route.turns.length, route.draft.original, route.draft.translation]),
-        ].join(':');
-    }
-
     function routeIsEmpty(routeId: RouteId) {
         const route = overlayState?.routes[routeId];
         return !route || (route.turns.length === 0 && !route.draft.original && !route.draft.translation);
-    }
-
-    function fitSubtitleTurns(node: HTMLElement, _dependency: string) {
-        let frame = 0;
-        const fit = () => {
-            cancelAnimationFrame(frame);
-            frame = requestAnimationFrame(() => {
-                const turns = Array.from(node.querySelectorAll<HTMLElement>(':scope > .overlay-turn'));
-                for (const turn of turns) turn.hidden = false;
-                if (!turns.length) return;
-                const gap = Number.parseFloat(getComputedStyle(node).rowGap) || 0;
-                let used = 0;
-                let visible = 0;
-                for (let index = turns.length - 1; index >= 0; index -= 1) {
-                    const turn = turns[index];
-                    const required = turn.offsetHeight + (visible ? gap : 0);
-                    if (visible && used + required > node.clientHeight) {
-                        turn.hidden = true;
-                    } else {
-                        used += required;
-                        visible += 1;
-                    }
-                }
-            });
-        };
-        const resizeObserver = new ResizeObserver(fit);
-        const mutationObserver = new MutationObserver(fit);
-        resizeObserver.observe(node);
-        mutationObserver.observe(node, { childList: true, subtree: true, characterData: true });
-        fit();
-        return {
-            update() {
-                fit();
-            },
-            destroy() {
-                cancelAnimationFrame(frame);
-                resizeObserver.disconnect();
-                mutationObserver.disconnect();
-            },
-        };
     }
 </script>
 
@@ -343,7 +292,7 @@
                             {@render routeHeader(overlayState, routeId)}
                         {/each}
                     </header>
-                    <div class="overlay-turns" use:fitSubtitleTurns={fitKey(...routeIds)}>
+                    <div class="overlay-turns">
                         {#each timeline as entry}
                             {@render turn(overlayState, entry.routeId, entry.original, entry.translation, entry.draft)}
                         {/each}
@@ -358,7 +307,7 @@
                     {#if routeState?.config.enabled !== false}
                         <section class="overlay-route">
                             <header>{@render routeHeader(overlayState, routeId)}</header>
-                            <div class="overlay-turns" use:fitSubtitleTurns={fitKey(routeId)}>
+                            <div class="overlay-turns">
                                 {#each routeState.turns as item}
                                     {@render turn(overlayState, routeId, item.original, item.translation, false)}
                                 {/each}

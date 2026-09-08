@@ -572,10 +572,8 @@ button {
     justify-content: flex-end;
     gap: calc(8px * var(--font-scale));
     overflow: hidden;
-}
-
-.overlay-turn[hidden] {
-    display: none;
+    /* Older turns run off the top; fade them instead of slicing a line in half. */
+    mask-image: linear-gradient(to bottom, transparent, black calc(18px * var(--font-scale)));
 }
 
 .overlay-turn p,
