@@ -59,6 +59,7 @@
   },
   "bundle": {
     "active": true,
+    "publisher": "Feiyu Wang",
     "targets": ["dmg", "nsis", "msi"],
     "icon": [
       "icons/32x32.png",
