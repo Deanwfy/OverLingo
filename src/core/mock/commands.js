@@ -47,12 +47,13 @@ export async function invoke(command, args = {}) {
     }
 }
 
-export async function getAutostartEnabled() {
-    return localStorage.getItem('overlingo-autostart') === 'true';
+export async function getAutostartStatus() {
+    return localStorage.getItem('overlingo-autostart') === 'true' ? 'enabled' : 'disabled';
 }
 
 export async function setAutostartEnabled(enabled) {
     localStorage.setItem('overlingo-autostart', String(enabled));
+    return getAutostartStatus();
 }
 
 // Writes what the Rust side would after a stop: the session JSON and its Markdown twin.

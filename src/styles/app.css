@@ -249,6 +249,10 @@ input:not([type="checkbox"]):not([type="range"]):focus {
     line-height: 1.35;
 }
 
+.settings-row .approval-note {
+    color: var(--secondary-text);
+}
+
 .doc-link {
     justify-self: start;
     display: inline-flex;

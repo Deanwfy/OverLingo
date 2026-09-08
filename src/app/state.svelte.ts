@@ -3,12 +3,14 @@ import { readableRuntimeError } from '../core/errors.js';
 import { currentLocale, setLocale, t } from '../core/locale.svelte';
 import { languageName } from '../core/languages.js';
 import {
-    getAutostartEnabled,
+    getAutostartStatus,
     invoke,
+    openAutostartSettings,
     sendControllerAction,
     setAutostartEnabled,
     subscribeController,
 } from '../core/runtime.js';
+import type { AutostartStatus } from '../core/runtime.js';
 import type {
     AppConfig,
     ControllerSnapshot,
@@ -39,7 +41,7 @@ export class AppState {
     config = $state<AppConfig>(structuredClone(DEFAULT_CONFIG) as AppConfig);
     credentials = $state<Credentials>({});
     loading = $state(true);
-    autostartEnabled = $state(false);
+    autostartStatus = $state<AutostartStatus>('disabled');
     autostartLoading = $state(false);
     view = $state<MainView>('translation');
     translationState = $state<TranslationState>('stopped');
@@ -60,6 +62,14 @@ export class AppState {
     private unsubscribeController: (() => void) | null = null;
     private lastNoticeId = 0;
 
+    get autostartEnabled() {
+        return this.autostartStatus === 'enabled';
+    }
+
+    get autostartNeedsApproval() {
+        return this.autostartStatus === 'requiresApproval';
+    }
+
     get translationActive() {
         return ['starting', 'running', 'paused'].includes(this.translationState);
     }
@@ -76,14 +86,14 @@ export class AppState {
         try {
             const [credentials, autostart, unsubscribe] = await Promise.all([
                 invoke('get_credential_status') as Promise<Credentials>,
-                getAutostartEnabled().catch(() => false),
+                getAutostartStatus().catch((): AutostartStatus => 'disabled'),
                 subscribeController(
                     'main',
                     (snapshot: ControllerSnapshot) => this.applyControllerSnapshot(snapshot),
                 ),
             ]);
             this.credentials = credentials;
-            this.autostartEnabled = autostart;
+            this.autostartStatus = autostart;
             this.unsubscribeController = unsubscribe;
         } catch (error) {
             this.notify(this.readableError(error), true);
@@ -141,16 +151,24 @@ export class AppState {
 
     async updateAutostart(enabled: boolean) {
         if (this.autostartLoading) return;
-        const previous = this.autostartEnabled;
-        this.autostartEnabled = enabled;
+        const previous = this.autostartStatus;
+        this.autostartStatus = enabled ? 'enabled' : 'disabled';
         this.autostartLoading = true;
         try {
-            await setAutostartEnabled(enabled);
+            this.autostartStatus = await setAutostartEnabled(enabled);
         } catch (error) {
-            this.autostartEnabled = previous;
+            this.autostartStatus = previous;
             this.notify(this.readableError(error), true);
         } finally {
             this.autostartLoading = false;
+        }
+    }
+
+    async openAutostartSettings() {
+        try {
+            await openAutostartSettings();
+        } catch (error) {
+            this.notify(this.readableError(error), true);
         }
     }
 

@@ -1,10 +1,5 @@
 import { Channel, invoke as invokeNative, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import {
-    disable as disableAutostart,
-    enable as enableAutostart,
-    isEnabled as isAutostartEnabled,
-} from '@tauri-apps/plugin-autostart';
 const native = isTauri();
 // The browser preview's fake backend only exists in dev builds; production builds drop it.
 const mock = !native && import.meta.env.DEV ? import('./mock/index.js') : null;
@@ -59,12 +54,16 @@ export async function openExternal(url) {
     else window.open(url, '_blank', 'noopener');
 }
 
-export async function getAutostartEnabled() {
-    return native ? isAutostartEnabled() : (await mock).getAutostartEnabled();
+export async function getAutostartStatus() {
+    return native ? invokeNative('get_autostart_status') : (await mock).getAutostartStatus();
 }
 
 export async function setAutostartEnabled(enabled) {
-    if (!native) return (await mock).setAutostartEnabled(enabled);
-    if (enabled) await enableAutostart();
-    else await disableAutostart();
+    return native
+        ? invokeNative('set_autostart_enabled', { enabled })
+        : (await mock).setAutostartEnabled(enabled);
+}
+
+export async function openAutostartSettings() {
+    if (native) await invokeNative('open_autostart_settings');
 }

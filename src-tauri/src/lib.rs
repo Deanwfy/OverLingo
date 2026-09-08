@@ -1,5 +1,6 @@
 mod app_config;
 mod audio;
+mod autostart;
 mod commands;
 mod controller;
 mod credentials;
@@ -42,19 +43,18 @@ pub fn run() {
     let credential_service = context.config().identifier.clone();
     let credential_state = CredentialState(Mutex::new(CredentialStore::load(credential_service)));
 
-    // The identifier keeps the LaunchAgent label reverse-DNS and keeps dev and release entries apart.
-    let autostart = tauri_plugin_autostart::Builder::new()
-        .arg("--background")
-        .app_name(context.config().identifier.clone());
-    #[cfg(target_os = "macos")]
-    let autostart = autostart.macos_launcher(tauri_plugin_autostart::MacosLauncher::LaunchAgent);
-
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(autostart.build());
+        .plugin(tauri_plugin_dialog::init());
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.plugin(
+        tauri_plugin_autostart::Builder::new()
+            .arg("--background")
+            .app_name(context.config().identifier.clone())
+            .build(),
+    );
 
     builder
         .manage(AudioState::new())
@@ -80,6 +80,9 @@ pub fn run() {
             commands::session_store::export_session,
             commands::session_store::delete_session,
             windowing::show_settings_window,
+            autostart::get_autostart_status,
+            autostart::set_autostart_enabled,
+            autostart::open_autostart_settings,
             overlay_pointer::set_overlay_interactive_height,
             controller::controller_action,
             controller::subscribe_controller,

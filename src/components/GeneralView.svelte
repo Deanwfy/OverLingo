@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { AppState } from '../app/state.svelte';
+    import Icon from './Icon.svelte';
 
     let { state }: { state: AppState } = $props();
 </script>
@@ -26,6 +27,12 @@
             <span>
                 <strong>{state.text('launchAtLogin')}</strong>
                 <small>{state.text('launchAtLoginHint')}</small>
+                {#if state.autostartNeedsApproval}
+                    <small class="approval-note">{state.text('launchAtLoginNeedsApproval')}</small>
+                    <button class="doc-link" onclick={() => state.openAutostartSettings()}>
+                        {state.text('openLoginItemsSettings')}<Icon name="external" size={11} />
+                    </button>
+                {/if}
             </span>
             <input
                 class="native-switch"
