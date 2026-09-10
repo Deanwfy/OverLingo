@@ -2,7 +2,7 @@
     import type { ControllerSnapshot, OverlayAction, RouteConfig, RouteId } from '../app/types';
     import { t } from '../core/locale.svelte';
     import { LANGUAGES, languageName } from '../core/languages.js';
-    import { supportsLanguage, translator, translators } from '../engines/registry.js';
+    import { supportsLanguage, translator, translators } from '../core/translators.js';
     import Icon from './Icon.svelte';
 
     let { routeId, state, send, starting, enabledCount }: {

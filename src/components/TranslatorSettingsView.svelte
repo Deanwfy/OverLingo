@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { AppState } from '../app/state.svelte';
-    import { docsUrl, providers } from '../engines/registry.js';
+    import { docsUrl, providers } from '../core/translators.js';
     import { openExternal } from '../core/runtime.js';
     import Icon from './Icon.svelte';
 

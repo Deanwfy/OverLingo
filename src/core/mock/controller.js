@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG } from '../../app/defaults';
-import { translator } from '../../engines/registry.js';
+import { translator } from '../translators.js';
 import { locale } from '../i18n.js';
 import { saveSession } from './commands.js';
 import { readJson, writeJson } from './storage.js';
