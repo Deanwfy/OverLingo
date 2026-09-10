@@ -80,7 +80,7 @@
     "macOS": {
       "entitlements": "Entitlements.plist",
       "frameworks": [],
-      "minimumSystemVersion": "14.4"
+      "minimumSystemVersion": "14.5"
     },
     "createUpdaterArtifacts": false
   }
