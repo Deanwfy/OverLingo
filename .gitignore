@@ -2,7 +2,7 @@
 npm-debug.log*
 node_modules/
 dist/
-src-tauri/target/
+src-tauri/target.noindex/
 src-tauri/gen/
 .playwright-cli/
 .idea/

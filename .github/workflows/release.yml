@@ -111,9 +111,9 @@ jobs:
         with:
           name: ${{ matrix.target }}
           path: |
-            src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
-            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
-            src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
+            src-tauri/target.noindex/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            src-tauri/target.noindex/${{ matrix.target }}/release/bundle/nsis/*.exe
+            src-tauri/target.noindex/${{ matrix.target }}/release/bundle/msi/*.msi
           if-no-files-found: error
 
   # Only reached when every target built: a release missing an architecture is

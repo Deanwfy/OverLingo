@@ -1,3 +1,8 @@
+# Spotlight skips directories with a `.noindex` suffix; it would otherwise index every
+# build's artifacts and keep the machine busy. Cargo's CACHEDIR.TAG means nothing to it.
+[build]
+target-dir = "src-tauri/target.noindex"
+
 # `tauri dev` runs the bare binary through `cargo run`; the runner signs it first so
 # Keychain and TCC keep recognising the app across rebuilds. See scripts/dev-runner.sh.
 [target.'cfg(target_os = "macos")']
