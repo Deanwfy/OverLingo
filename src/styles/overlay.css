@@ -483,6 +483,7 @@ button {
 }
 
 .overlay-route {
+    position: relative;
     min-width: 0;
     min-height: 0;
     display: flex;
@@ -499,13 +500,30 @@ button {
     border-bottom-left-radius: 0;
 }
 
-/* Same height as the toolbar it sits beside, so labels line up with its buttons. */
+/* Floats over the subtitles in the toolbar's band, so they get the full height; every
+   label in it carries its own opaque background. */
 .overlay-route > header {
-    flex: none;
-    min-height: 30px;
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    right: 14px;
+    left: 14px;
+    height: 30px;
     display: flex;
     align-items: center;
-    padding-right: 150px;
+    overflow: hidden;
+}
+
+/* The toolbar sits over this column's right end; the row stops where the toolbar starts. */
+.overlay-route:last-child > header {
+    right: calc(var(--toolbar-width) + 24px);
+}
+
+/* A failure notice needs the whole width and its buttons out from under the toolbar, so
+   the row drops to the line below the band. */
+.overlay-route > header:has(.route-failure) {
+    top: 30px;
+    right: 14px;
 }
 
 .overlay-route.merged > header {
@@ -537,6 +555,9 @@ button {
 .overlay-route > header .route-status {
     flex: none;
     margin-left: 6px;
+    padding: 3px 7px;
+    border-radius: 6px;
+    background: var(--chrome);
     color: rgba(232, 236, 255, .55);
     font-size: 10px;
     line-height: 1.2;
@@ -546,16 +567,15 @@ button {
 /* Sits where the transient status labels do, so a failed route reads the same way a
    connecting one does instead of pushing the subtitles down. */
 .route-failure {
-    /* The toolbar's drag surface hangs over this row; without lifting it the retry and
-       settings buttons are covered by a drag region the moment the toolbar is revealed. */
-    position: relative;
-    z-index: 4;
     flex: 1;
     min-width: 0;
     display: flex;
     align-items: center;
     gap: 4px;
     margin-left: 6px;
+    padding: 2px 4px 2px 7px;
+    border-radius: 6px;
+    background: var(--chrome);
     color: #ffb3b3;
     font-size: 10px;
     line-height: 1.2;
@@ -647,10 +667,6 @@ button {
 
     .overlay-route {
         padding-inline: 9px;
-    }
-
-    .overlay-route > header {
-        padding-right: 120px;
     }
 }
 

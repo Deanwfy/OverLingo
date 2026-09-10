@@ -31,6 +31,10 @@
     let settingsOpen = $state(false);
     let pointerOverControls = $state(false);
     let chromeElement = $state<HTMLElement | null>(null);
+    let toolbarElement = $state<HTMLElement | null>(null);
+    // The toolbar grows when the timer appears, and the rightmost route's labels have to
+    // stop short of it.
+    let toolbarWidth = $state(0);
     let reportedHeight = 0;
     const routeIds: RouteId[] = ['system', 'microphone'];
     let activeRouteCount = $derived(
@@ -79,6 +83,15 @@
         void chromeElement;
         void failedRouteCount;
         reportInteractiveHeight();
+    });
+
+    $effect(() => {
+        if (!toolbarElement) return;
+        const observer = new ResizeObserver(([entry]) => {
+            toolbarWidth = Math.ceil(entry.borderBoxSize[0]?.inlineSize ?? entry.contentRect.width);
+        });
+        observer.observe(toolbarElement);
+        return () => observer.disconnect();
     });
 
     function reportInteractiveHeight() {
@@ -197,10 +210,11 @@
         style:--active-route-count={merged ? 1 : Math.max(activeRouteCount, 1)}
         style:--overlay-opacity={overlayState.config.opacity}
         style:--font-scale={overlayState.config.fontScale}
+        style:--toolbar-width="{toolbarWidth}px"
     >
         <header class="overlay-chrome overlay-reveal" bind:this={chromeElement}>
             <div class="drag-surface" data-tauri-drag-region></div>
-            <nav aria-label={t('overlayControls')}>
+            <nav aria-label={t('overlayControls')} bind:this={toolbarElement}>
                 <button
                     class="translation-control"
                     class:running={overlayState.translationState === 'running'}
