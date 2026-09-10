@@ -336,7 +336,6 @@ body {
     min-height: 0;
     display: grid;
     grid-template-columns: repeat(var(--active-route-count), minmax(0, 1fr));
-    gap: 1px;
     /* Top inset matches the toolbar's, so each route header shares its centre line. */
     padding: 7px 9px 9px;
 }
@@ -352,11 +351,25 @@ body {
     background: rgba(255, 255, 255, .025);
 }
 
-.overlay-route + .overlay-route {
-    margin-left: 1px;
-    border-left: 1px solid rgba(255, 255, 255, .1);
+/* Two routes read as one sheet folded down the middle: square inner corners, one hairline. */
+.overlay-route:not(:last-child) {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.overlay-route:not(:first-child) {
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
+}
+
+.overlay-route + .overlay-route::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: 0;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, .12) 20% 80%, transparent);
 }
 
 /* Floats over the subtitles in the toolbar's band, so they get the full height; every
