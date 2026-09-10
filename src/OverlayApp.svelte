@@ -256,7 +256,7 @@
 
         {#snippet routeHeader(snapshot: ControllerSnapshot, routeId: RouteId)}
             {@const routeState = snapshot.routes[routeId]}
-            <span class="route-direction overlay-reveal" class:system={routeId === 'system'} lang={routeState.config.targetLanguage}>{direction(routeState.config)}</span>
+            <span class="route-direction overlay-reveal" data-route={routeId} lang={routeState.config.targetLanguage}>{direction(routeState.config)}</span>
             {#if routeState.state === 'failed'}
                 {@const message = readableError(routeState.error)}
                 <span class="route-failure" role="alert">

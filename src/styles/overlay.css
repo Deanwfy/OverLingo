@@ -2,6 +2,22 @@
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
     color-scheme: dark;
     background: transparent;
+    --accent: #5a74f7;
+    --green: #2cac6c;
+    --chrome: rgb(24, 25, 30);
+    --route: var(--accent);
+}
+
+/* Anything that belongs to system audio turns green by setting --route. Text takes the
+   ink, filled areas the surface, lines and controls the colour itself; the two shades are
+   re-derived on every element, so they follow whichever --route is in scope. */
+[data-route='system'] {
+    --route: var(--green);
+}
+
+* {
+    --route-ink: color-mix(in srgb, var(--route) 45%, white);
+    --route-surface: color-mix(in srgb, var(--route) 17%, var(--chrome));
 }
 
 * {
@@ -100,7 +116,7 @@ button {
     padding: 3px;
     border: 1px solid rgba(255, 255, 255, .13);
     border-radius: 10px;
-    background: rgba(24, 25, 30, .9);
+    background: color-mix(in srgb, var(--chrome) 90%, transparent);
     box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
     backdrop-filter: blur(18px);
 }
@@ -130,7 +146,7 @@ button {
 }
 
 .overlay-chrome button.active {
-    color: #aebcff;
+    color: var(--route-ink);
 }
 
 .overlay-chrome button:active {
@@ -147,15 +163,16 @@ button {
     display: flex;
     gap: 5px;
     padding: 0 9px;
-    background: rgba(91, 120, 255, .2);
+    background: var(--route-surface);
     color: #e0e6ff;
     font-size: 11px;
     font-weight: 650;
 }
 
 .overlay-chrome .translation-control.running {
-    background: rgba(55, 181, 121, .17);
-    color: #a9efcb;
+    --route: var(--green);
+    background: var(--route-surface);
+    color: var(--route-ink);
 }
 
 .translation-control time {
@@ -194,14 +211,9 @@ button {
 .source-settings-card {
     min-width: 0;
     padding: 10px;
-    border: 1px solid rgba(111, 133, 255, .18);
+    border: 1px solid rgba(255, 255, 255, .1);
     border-radius: 11px;
-    background: rgba(85, 112, 244, .07);
-}
-
-.source-settings-card.system {
-    border-color: rgba(62, 191, 130, .18);
-    background: rgba(43, 161, 104, .065);
+    background: var(--route-surface);
 }
 
 .source-settings-card.disabled > :not(header) {
@@ -219,13 +231,9 @@ button {
     display: flex;
     align-items: center;
     gap: 6px;
-    color: rgba(255, 255, 255, .88);
+    color: var(--route-ink);
     font-size: 12px;
     font-weight: 680;
-}
-
-.source-settings-card.system > header > span {
-    color: #8de3b6;
 }
 
 .mini-switch {
@@ -261,11 +269,7 @@ button {
 }
 
 .mini-switch input:checked + i {
-    background: #5473f3;
-}
-
-.source-settings-card.system .mini-switch input:checked + i {
-    background: #2da36e;
+    background: var(--route);
 }
 
 .mini-switch input:checked + i::after {
@@ -409,9 +413,33 @@ button {
     font-variant-numeric: tabular-nums;
 }
 
+/* Drawn like the switches beside it; accent-color alone gets re-tinted by the engine. */
 .overlay-range-row input {
+    --thumb: 14px;
     width: 100%;
-    accent-color: #768eff;
+    height: var(--thumb);
+    margin: 0;
+    appearance: none;
+    background: none;
+}
+
+/* The thumb travels the track minus its own width, so the fill has to end under it. */
+.overlay-range-row input::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background:
+        linear-gradient(var(--route), var(--route)) 0 / calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--fill)) 100% no-repeat,
+        rgba(255, 255, 255, .18);
+}
+
+.overlay-range-row input::-webkit-slider-thumb {
+    width: var(--thumb);
+    height: var(--thumb);
+    margin-top: calc((4px - var(--thumb)) / 2);
+    appearance: none;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
 }
 
 .overlay-settings-panel footer {
@@ -488,11 +516,7 @@ button {
 /* Merged timeline: a colour bar in the route's badge colour says who is speaking. */
 .overlay-route.merged .overlay-turn {
     padding-left: 9px;
-    border-left: 3px solid rgba(90, 116, 247, .7);
-}
-
-.overlay-route.merged .overlay-turn[data-route='system'] {
-    border-left-color: rgba(44, 172, 108, .7);
+    border-left: 3px solid var(--route);
 }
 
 .route-direction {
@@ -501,18 +525,13 @@ button {
     padding: 3px 7px;
     overflow: hidden;
     border-radius: 6px;
-    background: rgba(90, 116, 247, .17);
-    color: #b8c4ff;
+    background: var(--route-surface);
+    color: var(--route-ink);
     font-size: 10px;
     font-weight: 680;
     line-height: 1.2;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.route-direction.system {
-    background: rgba(44, 172, 108, .15);
-    color: #93e3ba;
 }
 
 .overlay-route > header .route-status {

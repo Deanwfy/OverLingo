@@ -133,7 +133,7 @@
             <section
                 class="source-settings-card"
                 class:disabled={!route.enabled}
-                class:system={routeId === 'system'}
+                data-route={routeId}
             >
                 <header>
                     <span>
@@ -277,6 +277,7 @@
                 max="100"
                 step="1"
                 value={state.config.opacity * 100}
+                style:--fill={state.config.opacity}
                 oninput={(event) => update({ opacity: Number(event.currentTarget.value) / 100 })}
             />
         </label>
@@ -288,6 +289,7 @@
                 max="180"
                 step="5"
                 value={state.config.fontScale * 100}
+                style:--fill={(state.config.fontScale * 100 - 75) / 105}
                 oninput={(event) => update({ fontScale: Number(event.currentTarget.value) / 100 })}
             />
         </label>
