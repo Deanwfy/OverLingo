@@ -1,5 +1,6 @@
-use crate::tray_icon::status_icon;
-use crate::tray_labels::{labels, resolve_locale, update_label};
+use super::tray_icon::status_icon;
+use super::tray_labels::{labels, update_label};
+use crate::app_config::resolve_locale;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::menu::{MenuBuilder, MenuItem, MenuItemBuilder};
 use tauri::tray::{TrayIcon, TrayIconBuilder};

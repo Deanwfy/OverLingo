@@ -1,9 +1,9 @@
 use crate::app_config::{AppConfig, RouteConfig};
-use crate::commands::openai_realtime::{self, OpenAiRealtimeConfig};
-use crate::commands::qwen_realtime::{self, QwenRealtimeConfig};
-use crate::commands::realtime::{Events, ProviderState};
-use crate::commands::soniox_realtime::{self, SonioxRealtimeConfig};
 use crate::credentials::CredentialStore;
+use crate::providers::openai_realtime::{self, OpenAiRealtimeConfig};
+use crate::providers::qwen_realtime::{self, QwenRealtimeConfig};
+use crate::providers::soniox_realtime::{self, SonioxRealtimeConfig};
+use crate::providers::{Events, ProviderState};
 
 /// Everything one route needs to dial its translator. `api_key` is resolved from the
 /// store by engine id, so no provider names itself twice.

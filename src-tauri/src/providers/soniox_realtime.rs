@@ -1,4 +1,4 @@
-use super::realtime::{Connection, Event, Events, FragmentKind, ProviderState};
+use super::{Connection, Event, Events, FragmentKind, ProviderState};
 use futures_util::{SinkExt, StreamExt};
 use std::time::Duration;
 use tokio::sync::mpsc;

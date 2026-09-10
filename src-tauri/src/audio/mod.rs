@@ -1,3 +1,4 @@
+pub mod capture;
 pub mod microphone;
 pub mod pcm;
 pub mod resampler;

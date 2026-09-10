@@ -17,9 +17,9 @@ impl ControllerActor {
         if let Ok(mut subscribers) = self.subscribers.lock() {
             subscribers.retain(|_, channel| channel.send(snapshot.clone()).is_ok());
         }
-        crate::windowing::update_tray_for_app(
+        crate::shell::update_tray_for_app(
             &self.app,
-            crate::windowing::TrayPresentation {
+            crate::shell::TrayPresentation {
                 locale: snapshot.locale.clone(),
                 translation_active: self.translation_state.is_active(),
                 translation_running: self.translation_state.is_translating(),
@@ -53,7 +53,7 @@ impl ControllerActor {
             })
             .collect();
         ControllerSnapshot {
-            locale: crate::tray_labels::resolve_locale(&self.config.locale),
+            locale: crate::app_config::resolve_locale(&self.config.locale),
             preferred_locale: self.config.locale.clone(),
             translation_state: self.translation_state,
             elapsed_seconds: self.session_clock.elapsed().as_secs(),
@@ -104,7 +104,7 @@ pub(super) fn initial_snapshot(app: &AppHandle, config: &AppConfig) -> Controlle
         })
         .collect();
     ControllerSnapshot {
-        locale: crate::tray_labels::resolve_locale(&config.locale),
+        locale: crate::app_config::resolve_locale(&config.locale),
         preferred_locale: config.locale.clone(),
         translation_state: super::state::TranslationState::Stopped,
         elapsed_seconds: 0,

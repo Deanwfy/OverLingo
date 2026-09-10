@@ -203,7 +203,7 @@ impl AppConfig {
         if !is_supported_locale(&self.locale) {
             self.locale = "auto".into();
         }
-        let interface = interface_language(&crate::tray_labels::resolve_locale(&self.locale));
+        let interface = interface_language(&resolve_locale(&self.locale));
         normalize_route(&mut self.routes.system, "system", interface);
         normalize_route(&mut self.routes.microphone, "microphone", interface);
         normalize_system_audio(&mut self.audio.system);
@@ -223,6 +223,26 @@ impl AppConfig {
         if crate::translators::qwen_region(&self.qwen.region).is_none() {
             self.qwen.region = "beijing".into();
         }
+    }
+}
+
+pub fn resolve_locale(configured: &str) -> String {
+    if configured != "auto" {
+        return configured.into();
+    }
+    let system = sys_locale::get_locale().unwrap_or_default().to_lowercase();
+    if system.starts_with("zh") {
+        "zh-Hans".into()
+    } else if system.starts_with("es") {
+        "es".into()
+    } else if system.starts_with("ja") {
+        "ja".into()
+    } else if system.starts_with("ko") {
+        "ko".into()
+    } else if system.starts_with("vi") {
+        "vi".into()
+    } else {
+        "en".into()
     }
 }
 
@@ -313,6 +333,12 @@ fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resolves_the_system_locale_to_a_supported_one() {
+        assert_ne!(resolve_locale("auto"), "auto");
+        assert_eq!(resolve_locale("ja"), "ja");
+    }
 
     #[test]
     fn normalizes_route_inputs_and_overlay() {

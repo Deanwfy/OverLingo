@@ -1,3 +1,7 @@
+pub mod openai_realtime;
+pub mod qwen_realtime;
+pub mod soniox_realtime;
+
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};

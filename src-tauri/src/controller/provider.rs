@@ -1,9 +1,9 @@
 use crate::app_config::{AppConfig, RouteConfig};
-use crate::commands::realtime::{Events, ProviderState};
 use crate::credentials::CredentialState;
+use crate::providers::{Events, ProviderState};
 use tauri::{AppHandle, Manager};
 
-pub(super) use crate::commands::realtime::{Event, FragmentKind};
+pub(super) use crate::providers::{Event, FragmentKind};
 
 /// Identifies a live session. Opaque so the controller can neither tell nor care which
 /// translator opened it.

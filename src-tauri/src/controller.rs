@@ -273,7 +273,7 @@ impl ControllerActor {
         }
         if let Some(code) = self.validate_start() {
             self.set_notice(Some(code), String::new());
-            let _ = crate::windowing::show_settings(&self.app);
+            let _ = crate::shell::show_settings(&self.app);
             self.publish();
             return;
         }

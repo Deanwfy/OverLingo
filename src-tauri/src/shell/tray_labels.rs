@@ -71,26 +71,6 @@ pub fn labels(locale: &str) -> Labels {
     }
 }
 
-pub fn resolve_locale(configured: &str) -> String {
-    if configured != "auto" {
-        return configured.into();
-    }
-    let system = sys_locale::get_locale().unwrap_or_default().to_lowercase();
-    if system.starts_with("zh") {
-        "zh-Hans".into()
-    } else if system.starts_with("es") {
-        "es".into()
-    } else if system.starts_with("ja") {
-        "ja".into()
-    } else if system.starts_with("ko") {
-        "ko".into()
-    } else if system.starts_with("vi") {
-        "vi".into()
-    } else {
-        "en".into()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,7 +83,6 @@ mod tests {
         assert_eq!(labels("vi").quit, "Thoát OverLingo");
         assert_eq!(labels("ja").open, "設定…");
         assert_eq!(labels("ko").show_overlay, "자막 창 표시");
-        assert_ne!(resolve_locale("auto"), "auto");
     }
 
     #[test]

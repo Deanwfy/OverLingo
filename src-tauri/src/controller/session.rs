@@ -3,7 +3,7 @@ use super::route::{ActiveRoute, CaptureKey, ProviderKey, Session};
 use super::state::{ClockChange, RouteState, TranslationState};
 use super::transcript::{TranscriptTurn, TurnAssembler};
 use super::{Action, ControllerActor, MICROPHONE_ROUTE, ROUTE_IDS};
-use crate::commands::audio::{AudioSink, AudioState, CaptureRequest};
+use crate::audio::capture::{AudioSink, AudioState, CaptureRequest};
 use crate::diagnostics;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;

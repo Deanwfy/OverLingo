@@ -5,17 +5,15 @@ mod commands;
 mod controller;
 mod credentials;
 mod diagnostics;
-mod overlay_pointer;
 mod persistence;
+mod providers;
+mod shell;
 mod translators;
-mod tray_icon;
-mod tray_labels;
-mod windowing;
 
 use app_config::AppConfig;
-use commands::audio::AudioState;
-use commands::realtime::ProviderState;
+use audio::capture::AudioState;
 use credentials::{CredentialState, CredentialStore};
+use providers::ProviderState;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::Manager;
@@ -66,10 +64,10 @@ pub fn run() {
             let config = AppConfig::load(app.handle());
             let locale = config.locale.clone();
             app.manage(controller::AppController::new(app.handle().clone(), config));
-            windowing::install(app, &locale)?;
+            shell::install(app, &locale)?;
             #[cfg(not(target_os = "macos"))]
             if !background_launch {
-                windowing::show_settings(app.handle()).map_err(std::io::Error::other)?;
+                shell::show_settings(app.handle()).map_err(std::io::Error::other)?;
             }
             Ok(())
         })
@@ -81,11 +79,11 @@ pub fn run() {
             commands::session_store::rename_session,
             commands::session_store::export_session,
             commands::session_store::delete_session,
-            windowing::show_settings_window,
+            shell::windowing::show_settings_window,
             autostart::get_autostart_status,
             autostart::set_autostart_enabled,
             autostart::open_autostart_settings,
-            overlay_pointer::set_overlay_interactive_height,
+            shell::overlay_pointer::set_overlay_interactive_height,
             controller::controller_action,
             controller::subscribe_controller,
         ])
@@ -96,7 +94,7 @@ pub fn run() {
             match event {
                 #[cfg(target_os = "macos")]
                 tauri::RunEvent::Reopen { .. } => {
-                    let _ = windowing::show_settings(app_handle);
+                    let _ = shell::show_settings(app_handle);
                 }
                 tauri::RunEvent::ExitRequested { api, .. }
                     if !EXIT_ALLOWED.load(Ordering::SeqCst) =>

@@ -1,7 +1,7 @@
 use super::model::{OverlaySettingsPatch, QwenSettingsPatch, RouteSettingsPatch};
 use super::{enabled_route_ids, route_config, route_config_mut, Action, ControllerActor};
 use crate::app_config::{is_overlay_layout, ApplicationReference, RouteConfig};
-use crate::commands::audio;
+use crate::audio::capture;
 use crate::credentials::CredentialState;
 use crate::translators::{engine_of, route_config_error, start_blocker};
 use tauri::Manager;
@@ -175,8 +175,8 @@ impl ControllerActor {
         self.publish();
         let sender = self.sender.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            let result = audio::list_capturable_applications()
-                .map(|applications| (applications, audio::list_input_devices()));
+            let result = capture::list_capturable_applications()
+                .map(|applications| (applications, capture::list_input_devices()));
             let _ = sender.send(Action::CaptureOptionsLoaded(result));
         });
     }
@@ -186,7 +186,7 @@ impl ControllerActor {
             return;
         };
         let _ = overlay.set_always_on_top(self.config.overlay.always_on_top);
-        crate::overlay_pointer::apply(
+        crate::shell::overlay_pointer::apply(
             &self.app,
             self.config.overlay.click_through && self.overlay_visible,
         );
