@@ -8,6 +8,8 @@ mod diagnostics;
 mod overlay_pointer;
 mod persistence;
 mod translators;
+mod tray_icon;
+mod tray_labels;
 mod windowing;
 
 use app_config::AppConfig;

@@ -1,20 +1,15 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { formatDuration } from './app/format';
     import type {
         ControllerSnapshot,
         OverlayAction,
         OverlaySettingsPatch,
-        RouteConfig,
         RouteId,
-        RouteState,
     } from './app/types';
-    import { mergeTimeline } from './app/timeline';
-    import Icon from './components/Icon.svelte';
     import OverlaySettingsPanel from './components/OverlaySettingsPanel.svelte';
-    import { setLocale, t } from './core/locale.svelte';
-    import { translationDirection } from './core/languages.js';
-    import { readableRuntimeError } from './core/errors.js';
+    import OverlaySubtitles from './components/OverlaySubtitles.svelte';
+    import OverlayToolbar from './components/OverlayToolbar.svelte';
+    import { setLocale } from './core/locale.svelte';
     import {
         onOverlayOutsideClick,
         onOverlayPointerHover,
@@ -43,15 +38,6 @@
     // A single route already occupies the whole overlay, so merging only means anything
     // with two of them.
     let merged = $derived(activeRouteCount > 1 && overlayState?.config.layout === 'merged');
-    let timeline = $derived(
-        overlayState && merged ? mergeTimeline(overlayState.routes, routeIds) : [],
-    );
-    let controlLabel = $derived(
-        overlayState?.translationState === 'paused' ? 'resume'
-            : overlayState?.translationState === 'running' ? 'pause'
-                : overlayState?.translationState === 'starting' ? 'connecting'
-                    : 'start',
-    );
 
     onMount(() => {
         const stoppers: Array<() => void> = [];
@@ -126,23 +112,6 @@
         closeSettings();
     }
 
-    const readableError = (message: string) => readableRuntimeError(message, t);
-
-    function direction(route: RouteConfig) {
-        return translationDirection(
-            route.sourceLanguage,
-            route.targetLanguage,
-            overlayState?.locale ?? 'en',
-        );
-    }
-
-    function routeStatus(state: RouteState) {
-        if (state === 'connecting') return 'connecting';
-        if (state === 'reconnecting') return 'reconnecting';
-        if (state === 'reconfiguring') return 'applyingSettings';
-        return '';
-    }
-
     function send(action: OverlayAction) {
         void sendControllerAction(action);
     }
@@ -162,42 +131,9 @@
         send({ type: 'settings', patch });
     }
 
-    function toggleAlwaysOnTop() {
-        const enabled = !overlayState?.config.alwaysOnTop;
-        update({ alwaysOnTop: enabled });
-    }
-
-    function toggleClickThrough() {
-        update({ clickThrough: !overlayState?.config.clickThrough });
-    }
-
-    function toggleSettings() {
-        settingsOpen = !settingsOpen;
-        if (settingsOpen) send({ type: 'requestCaptureOptions' });
-    }
-
-    function controlTranslation() {
-        if (!overlayState) return;
-        const command = overlayState.translationState === 'paused'
-            ? 'resume'
-            : overlayState.translationState === 'running'
-                ? 'pause'
-                : 'start';
-        send({ type: 'translation', command });
-    }
-
     async function openMoreSettings() {
         settingsOpen = false;
         await showSettingsWindow();
-    }
-
-    async function hideOverlayWindow() {
-        await sendControllerAction({ type: 'hide' });
-    }
-
-    function routeIsEmpty(routeId: RouteId) {
-        const route = overlayState?.routes[routeId];
-        return !route || (route.turns.length === 0 && !route.draft.original && !route.draft.translation);
     }
 </script>
 
@@ -212,52 +148,14 @@
         style:--font-scale={overlayState.config.fontScale}
         style:--toolbar-width="{toolbarWidth}px"
     >
-        <header class="overlay-chrome overlay-reveal" bind:this={chromeElement}>
-            <div class="drag-surface" data-tauri-drag-region></div>
-            <nav aria-label={t('overlayControls')} bind:this={toolbarElement}>
-                <button
-                    class="translation-control"
-                    class:running={overlayState.translationState === 'running'}
-                    disabled={overlayState.translationState === 'starting'}
-                    title={t(controlLabel)}
-                    onclick={controlTranslation}
-                >
-                    <Icon name={controlLabel === 'resume' || controlLabel === 'pause' ? controlLabel : 'play'} size={14} />
-                    <span>{t(controlLabel)}</span>
-                    {#if overlayState.translationState !== 'stopped' && overlayState.translationState !== 'failed'}
-                        <time>{formatDuration(overlayState.elapsedSeconds)}</time>
-                    {/if}
-                </button>
-                {#if ['running', 'paused', 'starting'].includes(overlayState.translationState)}
-                    <button
-                        class="stop-translation"
-                        title={t('end')}
-                        aria-label={t('end')}
-                        onclick={() => send({ type: 'translation', command: 'stop' })}
-                    ><Icon name="stop" size={13} /></button>
-                {/if}
-                <button
-                    class:active={overlayState.config.alwaysOnTop}
-                    title={t(overlayState.config.alwaysOnTop ? 'unpinOverlay' : 'pinOverlay')}
-                    aria-label={t(overlayState.config.alwaysOnTop ? 'unpinOverlay' : 'pinOverlay')}
-                    aria-pressed={overlayState.config.alwaysOnTop}
-                    onclick={toggleAlwaysOnTop}
-                ><Icon name="pin" size={15} /></button>
-                <button
-                    class:active={settingsOpen}
-                    title={t('overlaySettings')}
-                    aria-label={t('overlaySettings')}
-                    aria-expanded={settingsOpen}
-                    onclick={toggleSettings}
-                ><Icon name="settings" size={15} /></button>
-                <button
-                    class="close-overlay"
-                    title={t('hideOverlay')}
-                    aria-label={t('hideOverlay')}
-                    onclick={() => void hideOverlayWindow()}
-                ><Icon name="close" size={15} /></button>
-            </nav>
-        </header>
+        <OverlayToolbar
+            state={overlayState}
+            bind:settingsOpen
+            bind:chromeElement
+            bind:toolbarElement
+            {send}
+            {update}
+        />
 
         {#if settingsOpen}
             <OverlaySettingsPanel
@@ -268,74 +166,11 @@
             />
         {/if}
 
-        {#snippet routeHeader(snapshot: ControllerSnapshot, routeId: RouteId)}
-            {@const routeState = snapshot.routes[routeId]}
-            <span class="route-direction overlay-reveal" data-route={routeId} lang={routeState.config.targetLanguage}>{direction(routeState.config)}</span>
-            {#if routeState.state === 'failed'}
-                {@const message = readableError(routeState.error)}
-                <span class="route-failure" role="alert">
-                    <span title={message}>{message}</span>
-                    <button
-                        title={t('retryRoute')}
-                        aria-label={t('retryRoute')}
-                        onclick={() => send({ type: 'retryRoute', routeId })}
-                    ><Icon name="retry" size={13} /></button>
-                    <button
-                        title={t('openSettings')}
-                        aria-label={t('openSettings')}
-                        onclick={openMoreSettings}
-                    ><Icon name="settings" size={13} /></button>
-                </span>
-            {:else if routeStatus(routeState.state)}
-                <small class="route-status">{t(routeStatus(routeState.state))}</small>
-            {/if}
-        {/snippet}
-
-        {#snippet turn(snapshot: ControllerSnapshot, routeId: RouteId, original: string, translation: string, draft: boolean)}
-            <article class="overlay-turn" class:draft data-route={routeId}>
-                {#if snapshot.config.showOriginal && original}<p>{original}</p>{/if}
-                {#if snapshot.config.showTranslation && translation}<strong>{translation}</strong>{/if}
-            </article>
-        {/snippet}
-
-        <div class="overlay-routes" class:merged>
-            {#if merged}
-                <section class="overlay-route merged">
-                    <header>
-                        {#each routeIds as routeId}
-                            {@render routeHeader(overlayState, routeId)}
-                        {/each}
-                    </header>
-                    <div class="overlay-turns">
-                        {#each timeline as entry}
-                            {@render turn(overlayState, entry.routeId, entry.original, entry.translation, entry.draft)}
-                        {/each}
-                        {#if timeline.length === 0}
-                            <p class="overlay-empty">{t('emptyOverlay')}</p>
-                        {/if}
-                    </div>
-                </section>
-            {:else}
-                {#each routeIds as routeId}
-                    {@const routeState = overlayState.routes[routeId]}
-                    {#if routeState?.config.enabled !== false}
-                        <section class="overlay-route">
-                            <header>{@render routeHeader(overlayState, routeId)}</header>
-                            <div class="overlay-turns">
-                                {#each routeState.turns as item}
-                                    {@render turn(overlayState, routeId, item.original, item.translation, false)}
-                                {/each}
-                                {#if routeState.draft.original || routeState.draft.translation}
-                                    {@render turn(overlayState, routeId, routeState.draft.original, routeState.draft.translation, true)}
-                                {/if}
-                                {#if routeIsEmpty(routeId)}
-                                    <p class="overlay-empty">{t('emptyOverlay')}</p>
-                                {/if}
-                            </div>
-                        </section>
-                    {/if}
-                {/each}
-            {/if}
-        </div>
+        <OverlaySubtitles
+            state={overlayState}
+            {merged}
+            {send}
+            onOpenSettings={openMoreSettings}
+        />
     </main>
 {/if}

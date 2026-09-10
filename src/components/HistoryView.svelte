@@ -16,20 +16,20 @@
     let draftTitle = $state('');
 
     $effect(() => {
-        void app.selectedHistory?.id;
+        void app.history.selected?.id;
         exportOpen = false;
         renaming = false;
     });
 
     function startRename() {
-        draftTitle = app.selectedHistory?.title ?? '';
+        draftTitle = app.history.selected?.title ?? '';
         renaming = true;
     }
 
     function commitRename() {
         if (!renaming) return;
         renaming = false;
-        void app.renameHistory(draftTitle);
+        void app.history.rename(draftTitle);
     }
 
     function onRenameKey(event: KeyboardEvent) {
@@ -39,7 +39,7 @@
 
     function exportSession(mode: SessionExportMode) {
         exportOpen = false;
-        void app.exportHistory(mode);
+        void app.history.export(mode);
     }
 
     function focusField(node: HTMLInputElement) {
@@ -57,19 +57,19 @@
 
     <div class="history-layout">
         <aside class="history-sidebar">
-            {#if app.historyLoading}
+            {#if app.history.loading}
                 <div class="history-placeholder">{app.text('loading')}</div>
-            {:else if app.history.length === 0}
+            {:else if app.history.items.length === 0}
                 <div class="history-placeholder">
                     <Icon name="history" size={24} />
                     <span>{app.text('noHistory')}</span>
                 </div>
             {:else}
-                {#each app.history as session}
+                {#each app.history.items as session}
                     <button
-                        class:active={app.selectedHistory?.id === session.id}
+                        class:active={app.history.selected?.id === session.id}
                         class="history-item"
-                        onclick={() => app.selectHistory(session)}
+                        onclick={() => app.history.select(session)}
                     >
                         <strong>{session.title}</strong>
                         <span>{formatDate(session.created_at)} · {formatDuration(session.duration_sec)}</span>
@@ -79,7 +79,7 @@
         </aside>
 
         <article class="history-detail">
-            {#if !app.selectedHistory}
+            {#if !app.history.selected}
                 <div class="history-placeholder detail-placeholder">{app.text('selectSession')}</div>
             {:else}
                 <header>
@@ -94,9 +94,9 @@
                                 onkeydown={onRenameKey}
                             />
                         {:else}
-                            <h2>{app.selectedHistory.title}</h2>
+                            <h2>{app.history.selected.title}</h2>
                         {/if}
-                        <p>{formatDate(app.selectedHistory.created_at)} · {formatDuration(app.selectedHistory.duration_sec)}</p>
+                        <p>{formatDate(app.history.selected.created_at)} · {formatDuration(app.history.selected.duration_sec)}</p>
                     </div>
                     <div class="history-actions">
                         <div class="menu-anchor">
@@ -122,13 +122,13 @@
                         <button class="icon-button" aria-label={app.text('rename')} onclick={startRename}>
                             <Icon name="rename" size={18} />
                         </button>
-                        <button class="icon-button destructive" aria-label={app.text('delete')} onclick={() => app.deleteHistory()}>
+                        <button class="icon-button destructive" aria-label={app.text('delete')} onclick={() => app.history.delete()}>
                             <Icon name="trash" size={18} />
                         </button>
                     </div>
                 </header>
                 <div class="history-turns">
-                    {#each app.historySegments as segment}
+                    {#each app.history.segments as segment}
                         <section class="history-turn">
                             <small>{segment.ts} · {app.routeName(segment.route_id)}</small>
                             {#if segment.src}<p>{segment.src}</p>{/if}

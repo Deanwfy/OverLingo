@@ -1,4 +1,5 @@
 import { DEFAULT_CONFIG } from './defaults';
+import { HistoryState } from './history.svelte';
 import { readableRuntimeError } from '../core/errors.js';
 import { currentLocale, setLocale, t } from '../core/locale.svelte';
 import { languageName } from '../core/languages.js';
@@ -19,9 +20,6 @@ import type {
     RouteConfig,
     RouteId,
     RouteRuntimeState,
-    SessionDetail,
-    SessionExportMode,
-    SessionSummary,
     TranscriptDraft,
     TranscriptTurn,
     TranslationState,
@@ -52,10 +50,11 @@ export class AppState {
     elapsedSeconds = $state(0);
     toastMessage = $state('');
     toastIsError = $state(false);
-    history = $state<SessionSummary[]>([]);
-    historyLoading = $state(false);
-    selectedHistory = $state<SessionSummary | null>(null);
-    selectedHistoryDetail = $state<SessionDetail | null>(null);
+    history = new HistoryState({
+        notify: (message, error) => this.notify(message, error),
+        readableError: error => this.readableError(error),
+        routeName: routeId => this.routeName(routeId),
+    });
 
     private toastTimer: ReturnType<typeof setTimeout> | null = null;
     private qwenTimer: ReturnType<typeof setTimeout> | null = null;
@@ -76,10 +75,6 @@ export class AppState {
 
     get resolvedLocale() {
         return currentLocale();
-    }
-
-    get historySegments() {
-        return this.selectedHistoryDetail?.json.chunks.flatMap(chunk => chunk.segments) ?? [];
     }
 
     async init() {
@@ -122,7 +117,7 @@ export class AppState {
 
     async setView(view: MainView) {
         this.view = view;
-        if (view === 'history') await this.loadHistory();
+        if (view === 'history') await this.history.load();
     }
 
     async startTranslation() {
@@ -213,81 +208,6 @@ export class AppState {
         } catch (error) {
             this.notify(this.readableError(error), true);
             return false;
-        }
-    }
-
-    async loadHistory() {
-        this.historyLoading = true;
-        try {
-            this.history = await invoke('list_sessions') as SessionSummary[];
-            if (
-                this.selectedHistory
-                && !this.history.some(session => session.id === this.selectedHistory?.id)
-            ) {
-                this.selectedHistory = null;
-                this.selectedHistoryDetail = null;
-            }
-        } catch (error) {
-            this.notify(this.readableError(error), true);
-        } finally {
-            this.historyLoading = false;
-        }
-    }
-
-    async selectHistory(summary: SessionSummary) {
-        this.selectedHistory = summary;
-        this.selectedHistoryDetail = null;
-        try {
-            this.selectedHistoryDetail = await invoke('read_session', {
-                id: summary.id,
-            }) as SessionDetail;
-        } catch (error) {
-            this.notify(this.readableError(error), true);
-        }
-    }
-
-    async renameHistory(title: string) {
-        const target = this.selectedHistory;
-        const next = title.trim();
-        if (!target || !next || next === target.title) return;
-        try {
-            await invoke('rename_session', { id: target.id, title: next });
-            const renamed = { ...target, title: next };
-            this.history = this.history.map(
-                session => session.id === target.id ? renamed : session,
-            );
-            this.selectedHistory = renamed;
-        } catch {
-            this.notify(this.text('renameFailed'), true);
-        }
-    }
-
-    async exportHistory(mode: SessionExportMode) {
-        if (!this.selectedHistory) return;
-        try {
-            const saved = await invoke('export_session', {
-                id: this.selectedHistory.id,
-                mode,
-                labels: {
-                    system: this.routeName('system'),
-                    microphone: this.routeName('microphone'),
-                },
-            }) as boolean;
-            if (saved) this.notify(this.text('exportSaved'));
-        } catch {
-            this.notify(this.text('exportFailed'), true);
-        }
-    }
-
-    async deleteHistory() {
-        if (!this.selectedHistory || !window.confirm(this.text('confirmDelete'))) return;
-        try {
-            await invoke('delete_session', { id: this.selectedHistory.id });
-            this.selectedHistory = null;
-            this.selectedHistoryDetail = null;
-            await this.loadHistory();
-        } catch {
-            this.notify(this.text('deleteFailed'), true);
         }
     }
 

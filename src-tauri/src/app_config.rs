@@ -203,7 +203,7 @@ impl AppConfig {
         if !is_supported_locale(&self.locale) {
             self.locale = "auto".into();
         }
-        let interface = interface_language(&crate::windowing::resolve_locale(&self.locale));
+        let interface = interface_language(&crate::tray_labels::resolve_locale(&self.locale));
         normalize_route(&mut self.routes.system, "system", interface);
         normalize_route(&mut self.routes.microphone, "microphone", interface);
         normalize_system_audio(&mut self.audio.system);

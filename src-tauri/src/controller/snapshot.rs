@@ -53,7 +53,7 @@ impl ControllerActor {
             })
             .collect();
         ControllerSnapshot {
-            locale: crate::windowing::resolve_locale(&self.config.locale),
+            locale: crate::tray_labels::resolve_locale(&self.config.locale),
             preferred_locale: self.config.locale.clone(),
             translation_state: self.translation_state,
             elapsed_seconds: self.session_clock.elapsed().as_secs(),
@@ -104,7 +104,7 @@ pub(super) fn initial_snapshot(app: &AppHandle, config: &AppConfig) -> Controlle
         })
         .collect();
     ControllerSnapshot {
-        locale: crate::windowing::resolve_locale(&config.locale),
+        locale: crate::tray_labels::resolve_locale(&config.locale),
         preferred_locale: config.locale.clone(),
         translation_state: super::state::TranslationState::Stopped,
         elapsed_seconds: 0,
