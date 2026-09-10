@@ -12,6 +12,7 @@
         --surface-muted: light-dark(rgba(0, 0, 0, .035), rgba(255, 255, 255, .035));
         --control: light-dark(rgba(0, 0, 0, .055), rgba(255, 255, 255, .065));
         --control-hover: light-dark(rgba(0, 0, 0, .085), rgba(255, 255, 255, .105));
+        --control-active: light-dark(#fff, rgba(255, 255, 255, .16));
         --border: light-dark(rgba(0, 0, 0, .1), rgba(255, 255, 255, .1));
         --strong-border: light-dark(rgba(0, 0, 0, .17), rgba(255, 255, 255, .18));
         --text: light-dark(#1d1d1f, #f1f1f3);

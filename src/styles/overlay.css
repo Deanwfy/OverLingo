@@ -180,8 +180,21 @@ body {
     background: var(--route-surface);
 }
 
+.source-settings-card.disabled {
+    --route: var(--tertiary-text);
+}
+
 .source-settings-card.disabled > :not(header) {
     opacity: .45;
+}
+
+/* The card is dimmed as a whole, so its controls must not dim again on top. */
+.source-settings-card.disabled :disabled {
+    opacity: 1;
+}
+
+.source-settings-card.disabled > header > span {
+    color: var(--tertiary-text);
 }
 
 .source-settings-card > header {
