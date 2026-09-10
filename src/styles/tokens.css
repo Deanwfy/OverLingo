@@ -1,0 +1,46 @@
+@layer tokens, base, controls, views;
+
+/* One palette for both windows. The main window follows the system scheme; the overlay
+   pins itself to dark, so the same names resolve to the dark values there. */
+@layer tokens {
+    :root {
+        color-scheme: light dark;
+        --background: light-dark(#f5f5f7, #1d1e22);
+        --toolbar: light-dark(rgba(248, 248, 250, .86), rgba(31, 32, 36, .9));
+        --surface: light-dark(rgba(255, 255, 255, .82), rgba(255, 255, 255, .045));
+        --surface-solid: light-dark(#fff, #292a2f);
+        --surface-muted: light-dark(rgba(0, 0, 0, .035), rgba(255, 255, 255, .035));
+        --control: light-dark(rgba(0, 0, 0, .055), rgba(255, 255, 255, .065));
+        --control-hover: light-dark(rgba(0, 0, 0, .085), rgba(255, 255, 255, .105));
+        --border: light-dark(rgba(0, 0, 0, .1), rgba(255, 255, 255, .1));
+        --strong-border: light-dark(rgba(0, 0, 0, .17), rgba(255, 255, 255, .18));
+        --text: light-dark(#1d1d1f, #f1f1f3);
+        --secondary-text: light-dark(#65656a, #aaaab0);
+        --tertiary-text: light-dark(#929298, #777880);
+        --accent: light-dark(#4969df, #7189ef);
+        --accent-hover: light-dark(#3d5fd8, #8298f5);
+        --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+        --green: light-dark(#238a59, #55bf88);
+        --green-soft: color-mix(in srgb, var(--green) 12%, transparent);
+        --red: light-dark(#d34b4b, #ef7272);
+        --red-soft: color-mix(in srgb, var(--red) 11%, transparent);
+        --shadow: 0 1px 2px light-dark(rgba(0, 0, 0, .035), rgba(0, 0, 0, .16));
+        /* The accent in context: anything belonging to system audio turns green by
+           setting --route, and controls inside follow it. */
+        --route: var(--accent);
+    }
+
+    [data-route='system'] {
+        --route: var(--green);
+    }
+
+    /* Text takes the ink, filled areas the surface, lines and controls the colour itself.
+       Re-derived on every element, so they follow whichever --route is in scope. */
+    * {
+        --route-ink: light-dark(
+            color-mix(in srgb, var(--route) 80%, black),
+            color-mix(in srgb, var(--route) 45%, white)
+        );
+        --route-surface: color-mix(in srgb, var(--route) 15%, var(--surface-solid));
+    }
+}

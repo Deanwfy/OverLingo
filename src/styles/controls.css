@@ -1,0 +1,184 @@
+/* Form controls shared by both windows. Everything here is drawn by us, so the two
+   windows get the same controls in the same colours; only the select popup stays native. */
+@layer controls {
+    select,
+    input:not([type="checkbox"]):not([type="range"]) {
+        height: 32px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        outline: none;
+        background: var(--surface-solid);
+        color: var(--text);
+        padding: 0 9px;
+    }
+
+    select:focus,
+    input:not([type="checkbox"]):not([type="range"]):focus {
+        border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    select.compact {
+        height: 28px;
+        appearance: none;
+        overflow: hidden;
+        padding: 0 8px;
+        font-size: 10px;
+        text-overflow: ellipsis;
+    }
+
+    /* WebView2 does not consistently apply the inherited colour scheme to the native
+       popup, which can otherwise leave white option text on white. */
+    select option {
+        background: var(--surface-solid);
+        color: var(--text);
+    }
+
+    .switch {
+        position: relative;
+        width: 30px;
+        height: 18px;
+        flex: none;
+    }
+
+    .switch input {
+        position: absolute;
+        opacity: 0;
+    }
+
+    .switch i {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: var(--strong-border);
+        transition: background 120ms ease;
+    }
+
+    .switch i::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, .28);
+        transition: transform 120ms ease;
+    }
+
+    .switch input:checked + i {
+        background: var(--route);
+    }
+
+    .switch input:checked + i::after {
+        transform: translateX(12px);
+    }
+
+    .segmented {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 2px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--control);
+    }
+
+    .segmented button {
+        min-width: 90px;
+        height: 27px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--secondary-text);
+        padding: 0 15px;
+        font-size: 13px;
+        font-weight: 580;
+    }
+
+    .segmented button.active {
+        background: var(--surface-solid);
+        color: var(--text);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, .14);
+    }
+
+    .segmented.compact button {
+        min-width: 0;
+        height: 25px;
+        padding: 0 10px;
+        font-size: 10px;
+    }
+
+    .segmented.fill {
+        display: flex;
+    }
+
+    .segmented.fill button {
+        flex: 1;
+    }
+
+    .secondary-button,
+    .icon-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface-solid);
+        color: var(--text);
+        font-weight: 590;
+    }
+
+    .secondary-button {
+        min-height: 32px;
+        padding: 0 13px;
+        font-size: 12px;
+    }
+
+    .icon-button {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        color: var(--secondary-text);
+    }
+
+    .secondary-button:hover,
+    .icon-button:hover {
+        background: var(--control-hover);
+    }
+
+    .secondary-button.destructive,
+    .icon-button.destructive {
+        color: var(--red);
+    }
+
+    /* Drawn rather than accent-color, which the engine re-tints. The fill ends under the
+       thumb, whose travel is the track minus its own width. --fill is 0 to 1. */
+    input[type="range"] {
+        --thumb: 14px;
+        width: 100%;
+        height: var(--thumb);
+        margin: 0;
+        appearance: none;
+        background: none;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 999px;
+        background:
+            linear-gradient(var(--route), var(--route)) 0 / calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--fill, 0)) 100% no-repeat,
+            var(--strong-border);
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+        width: var(--thumb);
+        height: var(--thumb);
+        margin-top: calc((4px - var(--thumb)) / 2);
+        appearance: none;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, .28);
+    }
+}

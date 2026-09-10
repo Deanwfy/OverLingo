@@ -6,7 +6,7 @@
 </script>
 
 <div class="preference-view">
-    <header class="preference-heading">
+    <header class="page-heading">
         <h1>{state.text('general')}</h1>
     </header>
 
@@ -34,13 +34,15 @@
                     </button>
                 {/if}
             </span>
-            <input
-                class="native-switch"
-                type="checkbox"
-                checked={state.autostartEnabled}
-                disabled={state.autostartLoading}
-                onchange={(event) => state.updateAutostart(event.currentTarget.checked)}
-            />
+            <span class="switch">
+                <input
+                    type="checkbox"
+                    checked={state.autostartEnabled}
+                    disabled={state.autostartLoading}
+                    onchange={(event) => state.updateAutostart(event.currentTarget.checked)}
+                />
+                <i></i>
+            </span>
         </label>
     </section>
 </div>

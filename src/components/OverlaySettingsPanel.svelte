@@ -140,7 +140,7 @@
                         <Icon name={routeId === 'system' ? 'speaker' : 'mic'} size={14} />
                         {t(routeId === 'system' ? 'systemAudio' : 'microphone')}
                     </span>
-                    <label class="mini-switch">
+                    <label class="switch">
                         <input
                             type="checkbox"
                             checked={route.enabled}
@@ -156,6 +156,7 @@
                     <label class="compact-select full-width">
                         <span>{t('audioFrom')}</span>
                         <select
+                            class="compact"
                             value={state.audio.system.scope === 'application' ? selectedApplication?.bundleId : 'all'}
                             disabled={!route.enabled || state.capture.loading || starting}
                             onchange={(event) => send({ type: 'capture', bundleId: event.currentTarget.value })}
@@ -175,6 +176,7 @@
                     <label class="compact-select full-width">
                         <span>{t('microphoneFrom')}</span>
                         <select
+                            class="compact"
                             value={selectedMicrophone ?? 'default'}
                             disabled={!route.enabled || state.capture.loading || starting}
                             onchange={(event) => send({ type: 'microphoneDevice', device: event.currentTarget.value })}
@@ -194,6 +196,7 @@
                     <label class="compact-select">
                         <span>{t('sourceLanguage')}</span>
                         <select
+                            class="compact"
                             value={route.sourceLanguage}
                             disabled={!route.enabled || starting}
                             onchange={(event) => updateLanguage(routeId, 'sourceLanguage', event.currentTarget.value)}
@@ -213,6 +216,7 @@
                     <label class="compact-select">
                         <span>{t('targetLanguage')}</span>
                         <select
+                            class="compact"
                             value={route.targetLanguage}
                             disabled={!route.enabled || starting}
                             onchange={(event) => updateLanguage(routeId, 'targetLanguage', event.currentTarget.value)}
@@ -227,6 +231,7 @@
                 <label class="compact-select translator-select">
                     <span>{t('translator')}</span>
                     <select
+                            class="compact"
                         value={route.model}
                         disabled={!route.enabled || starting || !configured.length}
                         onchange={(event) => updateTranslator(routeId, event.currentTarget.value)}
@@ -243,7 +248,7 @@
     <div class="overlay-display-settings">
         <div class="content-toggle">
             <span>{t('subtitleContent')}</span>
-            <div>
+            <div class="segmented compact fill">
                 <button
                     class:active={state.config.showOriginal}
                     aria-pressed={state.config.showOriginal}
@@ -258,7 +263,7 @@
         </div>
         <div class="content-toggle">
             <span>{t('subtitleLayout')}</span>
-            <div role="radiogroup" aria-label={t('subtitleLayout')}>
+            <div class="segmented compact fill" role="radiogroup" aria-label={t('subtitleLayout')}>
                 {#each layouts as layout}
                     <button
                         role="radio"
@@ -295,7 +300,7 @@
         </label>
         <label class="overlay-switch-row">
             <span>{t('clickThrough')}</span>
-            <span class="mini-switch">
+            <span class="switch">
                 <input
                     type="checkbox"
                     checked={state.config.clickThrough}

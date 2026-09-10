@@ -13,7 +13,7 @@
 <header class="app-toolbar" data-tauri-drag-region>
     <div class="traffic-light-space" data-tauri-drag-region></div>
 
-    <nav class="segmented-control primary-navigation" aria-label={state.text('navigation')}>
+    <nav class="segmented primary-navigation" aria-label={state.text('navigation')}>
         {#each tabs as tab}
             <button
                 class:active={state.view === tab.id}

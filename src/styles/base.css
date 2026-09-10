@@ -1,0 +1,41 @@
+@layer base {
+    * {
+        box-sizing: border-box;
+    }
+
+    html,
+    body,
+    #app,
+    #overlay {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+    }
+
+    body {
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+        font-size: 13px;
+        user-select: none;
+    }
+
+    button,
+    select,
+    input {
+        font: inherit;
+    }
+
+    button,
+    select,
+    input[type="checkbox"] {
+        cursor: default;
+    }
+
+    button:disabled,
+    select:disabled,
+    input:disabled {
+        cursor: default;
+        opacity: .48;
+    }
+}

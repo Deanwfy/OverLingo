@@ -1,47 +1,11 @@
+@layer views {
 :root {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
     color-scheme: dark;
-    background: transparent;
-    --accent: #5a74f7;
-    --green: #2cac6c;
-    --chrome: rgb(24, 25, 30);
-    --route: var(--accent);
-}
-
-/* Anything that belongs to system audio turns green by setting --route. Text takes the
-   ink, filled areas the surface, lines and controls the colour itself; the two shades are
-   re-derived on every element, so they follow whichever --route is in scope. */
-[data-route='system'] {
-    --route: var(--green);
-}
-
-* {
-    --route-ink: color-mix(in srgb, var(--route) 45%, white);
-    --route-surface: color-mix(in srgb, var(--route) 17%, var(--chrome));
-}
-
-* {
-    box-sizing: border-box;
 }
 
 html,
-body,
-#overlay {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    overflow: hidden;
+body {
     background: transparent;
-}
-
-button,
-select,
-input {
-    font: inherit;
-}
-
-button {
-    cursor: default;
 }
 
 .overlay-shell {
@@ -116,13 +80,13 @@ button {
     padding: 3px;
     border: 1px solid rgba(255, 255, 255, .13);
     border-radius: 10px;
-    background: color-mix(in srgb, var(--chrome) 90%, transparent);
+    background: var(--toolbar);
     box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
     backdrop-filter: blur(18px);
 }
 
 .overlay-chrome button,
-.overlay-settings-panel button {
+.overlay-settings-panel button:not(.segmented button) {
     appearance: none;
     border: 0;
     color: rgba(255, 255, 255, .7);
@@ -236,46 +200,6 @@ button {
     font-weight: 680;
 }
 
-.mini-switch {
-    position: relative;
-    width: 28px;
-    height: 17px;
-}
-
-.mini-switch input {
-    position: absolute;
-    opacity: 0;
-}
-
-.mini-switch i {
-    position: absolute;
-    inset: 0;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, .18);
-    transition: background 120ms ease;
-}
-
-.mini-switch i::after {
-    content: "";
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 13px;
-    height: 13px;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .28);
-    transition: transform 120ms ease;
-}
-
-.mini-switch input:checked + i {
-    background: var(--route);
-}
-
-.mini-switch input:checked + i::after {
-    transform: translateX(11px);
-}
-
 .compact-select {
     min-width: 0;
     display: grid;
@@ -286,33 +210,6 @@ button {
     color: rgba(255, 255, 255, .46);
     font-size: 9px;
     font-weight: 620;
-}
-
-.compact-select select {
-    width: 100%;
-    height: 28px;
-    min-width: 0;
-    appearance: none;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, .12);
-    border-radius: 7px;
-    outline: none;
-    background: rgba(255, 255, 255, .07);
-    color: rgba(255, 255, 255, .88);
-    padding: 0 23px 0 8px;
-    font-size: 10px;
-    text-overflow: ellipsis;
-}
-
-/* WebView2 does not consistently apply the inherited dark color scheme to the
-   native select popup, which can otherwise leave white option text on white. */
-.compact-select select option {
-    background: #292a2f;
-    color: #f1f1f3;
-}
-
-.compact-select select:focus {
-    border-color: rgba(114, 139, 255, .7);
 }
 
 .compact-select.full-width {
@@ -369,28 +266,6 @@ button {
     font-weight: 620;
 }
 
-.content-toggle > div {
-    display: flex;
-    gap: 3px;
-    padding: 3px;
-    border-radius: 8px;
-    background: rgba(0, 0, 0, .18);
-}
-
-.content-toggle button {
-    flex: 1;
-    height: 25px;
-    border-radius: 6px;
-    background: transparent;
-    font-size: 10px;
-}
-
-.content-toggle button.active {
-    background: rgba(255, 255, 255, .12);
-    color: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
-}
-
 .overlay-switch-row {
     grid-column: 1 / -1;
     display: flex;
@@ -411,35 +286,6 @@ button {
     float: right;
     color: rgba(255, 255, 255, .84);
     font-variant-numeric: tabular-nums;
-}
-
-/* Drawn like the switches beside it; accent-color alone gets re-tinted by the engine. */
-.overlay-range-row input {
-    --thumb: 14px;
-    width: 100%;
-    height: var(--thumb);
-    margin: 0;
-    appearance: none;
-    background: none;
-}
-
-/* The thumb travels the track minus its own width, so the fill has to end under it. */
-.overlay-range-row input::-webkit-slider-runnable-track {
-    height: 4px;
-    border-radius: 999px;
-    background:
-        linear-gradient(var(--route), var(--route)) 0 / calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--fill)) 100% no-repeat,
-        rgba(255, 255, 255, .18);
-}
-
-.overlay-range-row input::-webkit-slider-thumb {
-    width: var(--thumb);
-    height: var(--thumb);
-    margin-top: calc((4px - var(--thumb)) / 2);
-    appearance: none;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
 }
 
 .overlay-settings-panel footer {
@@ -557,7 +403,7 @@ button {
     margin-left: 6px;
     padding: 3px 7px;
     border-radius: 6px;
-    background: var(--chrome);
+    background: var(--surface-solid);
     color: rgba(232, 236, 255, .55);
     font-size: 10px;
     line-height: 1.2;
@@ -575,7 +421,7 @@ button {
     margin-left: 6px;
     padding: 2px 4px 2px 7px;
     border-radius: 6px;
-    background: var(--chrome);
+    background: var(--surface-solid);
     color: #ffb3b3;
     font-size: 10px;
     line-height: 1.2;
@@ -679,4 +525,5 @@ button {
     .overlay-route {
         padding-block: 0 7px;
     }
+}
 }

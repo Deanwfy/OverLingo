@@ -29,7 +29,7 @@
 </script>
 
 <div class="preference-view translator-view">
-    <header class="preference-heading">
+    <header class="page-heading">
         <h1>{app.text('translators')}</h1>
     </header>
 
