@@ -4,11 +4,12 @@
   "description": "Controller and subtitle overlay permissions",
   "windows": [
     "main",
-    "overlay"
+    "overlay",
+    "overlay-chrome",
+    "overlay-panel"
   ],
   "permissions": [
     "core:default",
-    "core:window:allow-start-dragging",
     {
       "identifier": "opener:allow-open-url",
       "allow": [

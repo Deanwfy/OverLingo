@@ -79,6 +79,8 @@ export default {
     overlayControls: 'Subtitle controls',
     overlaySettings: 'Subtitle settings',
     hideOverlay: 'Hide subtitles',
+    moveOverlay: 'Move subtitles',
+    resizeOverlay: 'Resize subtitles',
     emptyOverlay: 'Subtitles will appear here',
     pinOverlay: 'Keep on top',
     unpinOverlay: 'Stop keeping on top',

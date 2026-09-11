@@ -79,6 +79,8 @@ export default {
     overlayControls: '자막 제어',
     overlaySettings: '자막 설정',
     hideOverlay: '자막 숨기기',
+    moveOverlay: '자막 이동',
+    resizeOverlay: '자막 크기 조절',
     emptyOverlay: '자막이 여기에 표시됩니다',
     pinOverlay: '항상 위에 표시',
     unpinOverlay: '항상 위 해제',

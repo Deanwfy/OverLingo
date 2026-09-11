@@ -79,6 +79,8 @@ export default {
     overlayControls: 'Controles de subtítulos',
     overlaySettings: 'Ajustes de subtítulos',
     hideOverlay: 'Ocultar subtítulos',
+    moveOverlay: 'Mover subtítulos',
+    resizeOverlay: 'Cambiar tamaño de los subtítulos',
     emptyOverlay: 'Los subtítulos aparecerán aquí',
     pinOverlay: 'Mantener en primer plano',
     unpinOverlay: 'Dejar de mantener en primer plano',

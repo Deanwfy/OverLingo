@@ -186,9 +186,14 @@ impl ControllerActor {
             return;
         };
         let _ = overlay.set_always_on_top(self.config.overlay.always_on_top);
+        crate::shell::overlay_chrome::set_always_on_top(
+            &self.app,
+            self.config.overlay.always_on_top,
+        );
         crate::shell::overlay_pointer::apply(
             &self.app,
-            self.config.overlay.click_through && self.overlay_visible,
+            self.overlay_visible,
+            self.config.overlay.click_through,
         );
     }
 
@@ -202,6 +207,7 @@ impl ControllerActor {
                 overlay.hide()
             };
         }
+        crate::shell::overlay_chrome::set_visible(&self.app, visible);
         self.apply_overlay_window_flags();
         if persist {
             self.save_config();

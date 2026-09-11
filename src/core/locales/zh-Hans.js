@@ -79,6 +79,8 @@ export default {
     overlayControls: '字幕操作',
     overlaySettings: '字幕设置',
     hideOverlay: '隐藏字幕',
+    moveOverlay: '移动字幕',
+    resizeOverlay: '调整字幕大小',
     emptyOverlay: '字幕将在这里显示',
     pinOverlay: '保持置顶',
     unpinOverlay: '取消置顶',

@@ -8,6 +8,10 @@ body {
     background: transparent;
 }
 
+#overlay {
+    position: relative;
+}
+
 .overlay-shell {
     --overlay-opacity: .75;
     --font-scale: 1;
@@ -25,309 +29,73 @@ body {
     color: rgba(255, 255, 255, .96);
 }
 
-.overlay-chrome {
+/* The box's padding, which reads as a rim around the columns; overlay_pointer.rs keeps
+   the same band clickable while clicks pass through. Edges move the box, corners resize it. */
+.overlay-handle {
     position: absolute;
-    z-index: 4;
-    top: 7px;
-    right: 7px;
-    left: 7px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    z-index: 6;
+    --band: 9px;
+    --corner: 20px;
+}
+
+.overlay-handle[data-edge='n'],
+.overlay-handle[data-edge='s'] {
+    right: var(--corner);
+    left: var(--corner);
+    height: var(--band);
+    cursor: grab;
+}
+
+.overlay-handle[data-edge='e'],
+.overlay-handle[data-edge='w'] {
+    top: var(--corner);
+    bottom: var(--corner);
+    width: var(--band);
+    cursor: grab;
+}
+
+.overlay-handle[data-edge^='n'] { top: 0; }
+.overlay-handle[data-edge^='s'] { bottom: 0; }
+.overlay-handle[data-edge$='e'] { right: 0; }
+.overlay-handle[data-edge$='w'] { left: 0; }
+
+.overlay-handle[data-edge='ne'],
+.overlay-handle[data-edge='nw'],
+.overlay-handle[data-edge='se'],
+.overlay-handle[data-edge='sw'] {
+    width: var(--corner);
+    height: var(--corner);
+}
+
+.overlay-handle[data-edge='ne'],
+.overlay-handle[data-edge='sw'] {
+    cursor: nesw-resize;
+}
+
+.overlay-handle[data-edge='nw'],
+.overlay-handle[data-edge='se'] {
+    cursor: nwse-resize;
+}
+
+.overlay-handle[data-edge='n']:active,
+.overlay-handle[data-edge='s']:active,
+.overlay-handle[data-edge='e']:active,
+.overlay-handle[data-edge='w']:active {
+    cursor: grabbing;
 }
 
 /* Session metadata rather than subtitle content: present when the user reaches for the
-   overlay, out of the way while they are reading. */
+   overlay, out of the way while they are reading. The pointer watcher drives it, since
+   the controls live in a window of their own and clicks may pass through this one. */
 .overlay-reveal {
     opacity: 0;
-    pointer-events: none;
     transform: translateY(-3px);
     transition: opacity 140ms ease, transform 140ms ease;
 }
 
-.overlay-shell:hover .overlay-reveal,
-.overlay-shell.settings-open .overlay-reveal {
+.overlay-shell.pointer-over-controls .overlay-reveal {
     opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-}
-
-/* Clicks pass through, so hover cannot be trusted; the pointer watcher drives it instead. */
-.overlay-shell.click-through .overlay-reveal {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-3px);
-}
-
-.overlay-shell.click-through.pointer-over-controls .overlay-reveal,
-.overlay-shell.click-through.settings-open .overlay-reveal {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-}
-
-.drag-surface {
-    align-self: stretch;
-    flex: 1;
-    cursor: grab;
-}
-
-.overlay-chrome nav {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    padding: 3px;
-    border: 1px solid rgba(255, 255, 255, .13);
-    border-radius: 10px;
-    background: var(--toolbar);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, .22);
-    backdrop-filter: blur(18px);
-}
-
-.overlay-chrome button,
-.overlay-settings-panel button:not(.segmented button) {
-    appearance: none;
-    border: 0;
-    color: rgba(255, 255, 255, .7);
-}
-
-.overlay-chrome button {
-    width: 26px;
-    height: 26px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border-radius: 7px;
-    background: transparent;
-    transition: color 100ms ease, background 100ms ease;
-}
-
-.overlay-chrome button:hover,
-.overlay-chrome button.active {
-    background: rgba(255, 255, 255, .1);
-    color: #fff;
-}
-
-.overlay-chrome button.active {
-    color: var(--route-ink);
-}
-
-.overlay-chrome button:active {
-    background: rgba(255, 255, 255, .18);
-}
-
-.overlay-chrome button:disabled,
-.overlay-settings-panel button:disabled {
-    opacity: .42;
-}
-
-.overlay-chrome .translation-control {
-    width: auto;
-    display: flex;
-    gap: 5px;
-    padding: 0 9px;
-    background: var(--route-surface);
-    color: #e0e6ff;
-    font-size: 11px;
-    font-weight: 650;
-}
-
-.overlay-chrome .translation-control.running {
-    --route: var(--green);
-    background: var(--route-surface);
-    color: var(--route-ink);
-}
-
-.translation-control time {
-    color: rgba(255, 255, 255, .48);
-    font-variant-numeric: tabular-nums;
-    font-weight: 500;
-}
-
-.stop-translation,
-.close-overlay {
-    color: rgba(255, 145, 145, .75) !important;
-}
-
-.overlay-settings-panel {
-    position: absolute;
-    z-index: 5;
-    top: 43px;
-    right: 8px;
-    width: min(690px, calc(100% - 16px));
-    max-height: calc(100% - 51px);
-    overflow: auto;
-    padding: 10px;
-    border: 1px solid rgba(255, 255, 255, .15);
-    border-radius: 14px;
-    background: rgba(27, 28, 34, .97);
-    box-shadow: 0 22px 58px rgba(0, 0, 0, .42);
-    backdrop-filter: blur(24px);
-}
-
-.source-settings-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-}
-
-.source-settings-card {
-    min-width: 0;
-    padding: 10px;
-    border: 1px solid rgba(255, 255, 255, .1);
-    border-radius: 11px;
-    background: var(--route-surface);
-}
-
-.source-settings-card.disabled {
-    --route: var(--tertiary-text);
-}
-
-.source-settings-card.disabled > :not(header) {
-    opacity: .45;
-}
-
-/* The card is dimmed as a whole, so its controls must not dim again on top. */
-.source-settings-card.disabled :disabled {
-    opacity: 1;
-}
-
-.source-settings-card.disabled > header > span {
-    color: var(--tertiary-text);
-}
-
-.source-settings-card > header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 9px;
-}
-
-.source-settings-card > header > span {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--route-ink);
-    font-size: 12px;
-    font-weight: 680;
-}
-
-.compact-select {
-    min-width: 0;
-    display: grid;
-    gap: 4px;
-}
-
-.compact-select > span {
-    color: rgba(255, 255, 255, .46);
-    font-size: 9px;
-    font-weight: 620;
-}
-
-.compact-select.full-width {
-    margin-bottom: 8px;
-}
-
-.language-pair-mini {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 26px minmax(0, 1fr);
-    align-items: end;
-    gap: 5px;
-}
-
-.compact-select.translator-select {
-    margin-top: 8px;
-}
-
-.swap-mini {
-    width: 26px;
-    height: 28px;
-    display: grid;
-    place-items: center;
-    padding: 0;
-    border-radius: 7px;
-    background: transparent;
-}
-
-.swap-mini:hover {
-    background: rgba(255, 255, 255, .08);
-    color: #fff;
-}
-
-.overlay-display-settings {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: end;
-    gap: 14px;
-    margin-top: 10px;
-    padding: 10px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, .045);
-}
-
-.content-toggle,
-.overlay-range-row {
-    display: grid;
-    gap: 7px;
-}
-
-.content-toggle > span,
-.overlay-range-row > span {
-    color: rgba(255, 255, 255, .57);
-    font-size: 10px;
-    font-weight: 620;
-}
-
-.overlay-switch-row {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding-top: 9px;
-    border-top: 1px solid rgba(255, 255, 255, .07);
-}
-
-.overlay-switch-row > span:first-child {
-    color: rgba(255, 255, 255, .57);
-    font-size: 10px;
-    font-weight: 620;
-}
-
-.overlay-range-row output {
-    float: right;
-    color: rgba(255, 255, 255, .84);
-    font-variant-numeric: tabular-nums;
-}
-
-.overlay-settings-panel footer {
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, .08);
-}
-
-.more-settings {
-    width: 100%;
-    height: 29px;
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 0 7px;
-    border-radius: 7px;
-    background: transparent;
-    font-size: 11px;
-    text-align: left;
-}
-
-.more-settings:hover {
-    background: rgba(255, 255, 255, .07);
-    color: #fff;
-}
-
-.more-settings span {
-    margin-left: auto;
-    font-size: 17px;
+    transform: none;
 }
 
 .overlay-routes {
@@ -336,8 +104,9 @@ body {
     min-height: 0;
     display: grid;
     grid-template-columns: repeat(var(--active-route-count), minmax(0, 1fr));
-    /* Top inset matches the toolbar's, so each route header shares its centre line. */
-    padding: 7px 9px 9px;
+    /* With the 1px border this is the 9px rim the handles cover; the columns' radius is
+       the box's minus the rim, so the two rings stay concentric. */
+    padding: 8px;
 }
 
 .overlay-route {
@@ -347,7 +116,7 @@ body {
     display: flex;
     flex-direction: column;
     padding: 0 14px 12px;
-    border-radius: 11px;
+    border-radius: 9px;
     background: rgba(255, 255, 255, .025);
 }
 
@@ -372,8 +141,8 @@ body {
     background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, .12) 20% 80%, transparent);
 }
 
-/* Floats over the subtitles in the toolbar's band, so they get the full height; every
-   label in it carries its own opaque background. */
+/* Floats over the subtitles, so they get the full height; every label in it carries its
+   own opaque background. */
 .overlay-route > header {
     position: absolute;
     z-index: 2;
@@ -384,18 +153,6 @@ body {
     display: flex;
     align-items: center;
     overflow: hidden;
-}
-
-/* The toolbar sits over this column's right end; the row stops where the toolbar starts. */
-.overlay-route:last-child > header {
-    right: calc(var(--toolbar-width) + 24px);
-}
-
-/* A failure notice needs the whole width and its buttons out from under the toolbar, so
-   the row drops to the line below the band. */
-.overlay-route > header:has(.route-failure) {
-    top: 30px;
-    right: 14px;
 }
 
 .overlay-route.merged > header {
@@ -528,26 +285,12 @@ body {
 }
 
 @media (max-width: 700px) {
-    .source-settings-grid,
-    .overlay-display-settings {
-        grid-template-columns: 1fr;
-    }
-
-    .overlay-settings-panel {
-        width: min(355px, calc(100% - 16px));
-    }
-
     .overlay-route {
         padding-inline: 9px;
     }
 }
 
 @media (max-height: 220px) {
-    .overlay-settings-panel {
-        top: 39px;
-        max-height: calc(100% - 45px);
-    }
-
     .overlay-route {
         padding-block: 0 7px;
     }
