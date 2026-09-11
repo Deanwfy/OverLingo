@@ -17,6 +17,7 @@ export default defineConfig({
             input: {
                 main: fileURLToPath(new URL('./src/index.html', import.meta.url)),
                 overlay: fileURLToPath(new URL('./src/overlay.html', import.meta.url)),
+                chrome: fileURLToPath(new URL('./src/chrome.html', import.meta.url)),
             },
         },
     },

@@ -79,6 +79,8 @@ export default {
     overlayControls: '字幕の操作',
     overlaySettings: '字幕設定',
     hideOverlay: '字幕を隠す',
+    moveOverlay: '字幕を移動',
+    resizeOverlay: '字幕のサイズを変更',
     emptyOverlay: '字幕はここに表示されます',
     pinOverlay: '常に手前に表示',
     unpinOverlay: '常に手前を解除',

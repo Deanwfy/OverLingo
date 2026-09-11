@@ -95,7 +95,7 @@ pub fn subscribe_controller(
     on_event: Channel<ControllerSnapshot>,
     controller: State<'_, AppController>,
 ) -> Result<(), String> {
-    if !matches!(surface.as_str(), "main" | "overlay") {
+    if !matches!(surface.as_str(), "main" | "overlay" | "toolbar" | "panel") {
         return Err("Invalid controller surface".into());
     }
     controller.subscribe(surface, on_event)

@@ -1,17 +1,11 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import type {
-        ControllerSnapshot,
-        OverlayAction,
-        OverlaySettingsPatch,
-        RouteId,
-    } from './app/types';
-    import OverlaySettingsPanel from './components/OverlaySettingsPanel.svelte';
+    import type { ControllerSnapshot, OverlayAction, RouteId } from './app/types';
     import OverlaySubtitles from './components/OverlaySubtitles.svelte';
-    import OverlayToolbar from './components/OverlayToolbar.svelte';
-    import { setLocale } from './core/locale.svelte';
+    import { setLocale, t } from './core/locale.svelte';
     import {
-        onOverlayOutsideClick,
+        dismissOverlayChrome,
+        dragOverlay,
         onOverlayPointerHover,
         sendControllerAction,
         setOverlayInteractiveHeight,
@@ -19,17 +13,19 @@
         subscribeController,
     } from './core/runtime.js';
 
-    // A little slack above the toolbar so nearing the top edge already reveals the controls.
-    const CONTROL_STRIP_MARGIN = 8;
+    // A little slack below a notice so its buttons stay reachable near the edge.
+    const NOTICE_MARGIN = 8;
+    // The window system no longer moves or resizes this window: with clicks passing
+    // through, its edges are only reachable through the pointer watcher's band, so the
+    // handles are drawn here and the backend follows the cursor. Edges move, corners resize.
+    // The window system's own drag was tried and dropped: across displays it leaves the
+    // transparent box smeared in stair-steps until release.
+    const EDGES = ['n', 's', 'e', 'w'];
+    const CORNERS = ['ne', 'nw', 'se', 'sw'];
+    let dragging = false;
 
     let overlayState = $state<ControllerSnapshot | null>(null);
-    let settingsOpen = $state(false);
     let pointerOverControls = $state(false);
-    let chromeElement = $state<HTMLElement | null>(null);
-    let toolbarElement = $state<HTMLElement | null>(null);
-    // The toolbar grows when the timer appears, and the rightmost route's labels have to
-    // stop short of it.
-    let toolbarWidth = $state(0);
     let reportedHeight = 0;
     const routeIds: RouteId[] = ['system', 'microphone'];
     let activeRouteCount = $derived(
@@ -38,6 +34,9 @@
     // A single route already occupies the whole overlay, so merging only means anything
     // with two of them.
     let merged = $derived(activeRouteCount > 1 && overlayState?.config.layout === 'merged');
+    let failedRouteCount = $derived(
+        routeIds.filter(routeId => overlayState?.routes[routeId]?.state === 'failed').length,
+    );
 
     onMount(() => {
         const stoppers: Array<() => void> = [];
@@ -45,132 +44,92 @@
             overlayState = payload;
             setLocale(payload.locale);
         }).then((stop: () => void) => stoppers.push(stop));
-        void onOverlayOutsideClick(closeSettings).then((stop: () => void) => stoppers.push(stop));
         void onOverlayPointerHover((hovering: boolean) => {
             pointerOverControls = hovering;
         }).then((stop: () => void) => stoppers.push(stop));
-        document.addEventListener('pointerdown', dismissOnOutsidePointer, true);
-        window.addEventListener('blur', dismissOnBlur);
         window.addEventListener('resize', reportInteractiveHeight);
         return () => {
             for (const stop of stoppers) stop();
-            document.removeEventListener('pointerdown', dismissOnOutsidePointer, true);
-            window.removeEventListener('blur', dismissOnBlur);
             window.removeEventListener('resize', reportInteractiveHeight);
         };
     });
 
-    let failedRouteCount = $derived(
-        routeIds.filter(routeId => overlayState?.routes[routeId]?.state === 'failed').length,
-    );
-
     $effect(() => {
-        void settingsOpen;
-        void chromeElement;
         void failedRouteCount;
         reportInteractiveHeight();
     });
 
-    $effect(() => {
-        if (!toolbarElement) return;
-        const observer = new ResizeObserver(([entry]) => {
-            toolbarWidth = Math.ceil(entry.borderBoxSize[0]?.inlineSize ?? entry.contentRect.width);
-        });
-        observer.observe(toolbarElement);
-        return () => observer.disconnect();
-    });
-
+    // Clicks pass through the box, so a failure notice with buttons in it has to claim
+    // a strip below the top edge or the user cannot reach its own actions.
     function reportInteractiveHeight() {
-        const controlStrip = chromeElement
-            ? chromeElement.getBoundingClientRect().bottom + CONTROL_STRIP_MARGIN
-            : 0;
-        // Clicks pass through everything below the reported strip, so a failure notice with
-        // buttons in it has to extend the strip or the user cannot reach its own actions.
-        const reachable = [...document.querySelectorAll('.route-failure')]
-            .map(element => element.getBoundingClientRect().bottom + CONTROL_STRIP_MARGIN);
-        const height = Math.ceil(
-            settingsOpen ? window.innerHeight : Math.max(controlStrip, ...reachable),
-        );
+        const box = document.querySelector('.overlay-shell')?.getBoundingClientRect();
+        const height = Math.ceil(Math.max(0, ...[...document.querySelectorAll('.route-failure')]
+            .map(element => element.getBoundingClientRect().bottom - (box?.top ?? 0) + NOTICE_MARGIN)));
         if (height === reportedHeight) return;
         reportedHeight = height;
         void setOverlayInteractiveHeight(height);
     }
 
-    function closeSettings() {
-        settingsOpen = false;
+    function onPointerDown() {
+        void dismissOverlayChrome();
     }
 
-    function dismissOnOutsidePointer(event: PointerEvent) {
-        if (!settingsOpen) return;
-        const target = event.target as HTMLElement | null;
-        if (target?.closest('.overlay-settings-panel, .overlay-chrome nav')) return;
-        closeSettings();
+    function beginHandle(event: PointerEvent, corner?: string) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        (event.currentTarget as Element).setPointerCapture(event.pointerId);
+        dragging = true;
+        void dragOverlay(true, corner ?? null);
     }
 
-    function dismissOnBlur() {
-        if (document.activeElement instanceof HTMLSelectElement) return;
-        closeSettings();
+    function endHandle() {
+        if (!dragging) return;
+        dragging = false;
+        void dragOverlay(false);
     }
 
     function send(action: OverlayAction) {
         void sendControllerAction(action);
     }
-
-    function update(patch: OverlaySettingsPatch) {
-        if (!overlayState) return;
-        if (patch.showOriginal === false && !overlayState.config.showTranslation) {
-            patch.showTranslation = true;
-        }
-        if (patch.showTranslation === false && !overlayState.config.showOriginal) {
-            patch.showOriginal = true;
-        }
-        overlayState = {
-            ...overlayState,
-            config: { ...overlayState.config, ...patch },
-        };
-        send({ type: 'settings', patch });
-    }
-
-    async function openMoreSettings() {
-        settingsOpen = false;
-        await showSettingsWindow();
-    }
 </script>
+
+<svelte:document onpointerdown={onPointerDown} />
 
 {#if overlayState}
     <main
-        class:settings-open={settingsOpen}
-        class:click-through={overlayState.config.clickThrough}
-        class:pointer-over-controls={pointerOverControls}
         class="overlay-shell"
+        class:pointer-over-controls={pointerOverControls}
         style:--active-route-count={merged ? 1 : Math.max(activeRouteCount, 1)}
         style:--overlay-opacity={overlayState.config.opacity}
         style:--font-scale={overlayState.config.fontScale}
-        style:--toolbar-width="{toolbarWidth}px"
     >
-        <OverlayToolbar
-            state={overlayState}
-            bind:settingsOpen
-            bind:chromeElement
-            bind:toolbarElement
-            {send}
-            {update}
-        />
-
-        {#if settingsOpen}
-            <OverlaySettingsPanel
-                state={overlayState}
-                {send}
-                {update}
-                onMoreSettings={openMoreSettings}
-            />
-        {/if}
-
         <OverlaySubtitles
             state={overlayState}
             {merged}
             {send}
-            onOpenSettings={openMoreSettings}
+            onOpenSettings={() => void showSettingsWindow()}
         />
     </main>
+    {#each EDGES as edge}
+        <div
+            class="overlay-handle"
+            role="separator"
+            aria-label={t('moveOverlay')}
+            data-edge={edge}
+            onpointerdown={(event) => beginHandle(event)}
+            onpointerup={endHandle}
+            onpointercancel={endHandle}
+        ></div>
+    {/each}
+    {#each CORNERS as corner}
+        <div
+            class="overlay-handle"
+            role="separator"
+            aria-label={t('resizeOverlay')}
+            data-edge={corner}
+            onpointerdown={(event) => beginHandle(event, corner)}
+            onpointerup={endHandle}
+            onpointercancel={endHandle}
+        ></div>
+    {/each}
 {/if}

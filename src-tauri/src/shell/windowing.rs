@@ -1,3 +1,4 @@
+use super::overlay_chrome;
 use super::tray_icon::status_icon;
 use super::tray_labels::{labels, update_label};
 use crate::app_config::resolve_locale;
@@ -121,6 +122,26 @@ pub fn install(app: &mut App, locale: &str) -> tauri::Result<()> {
     }
     if let Some(overlay) = app.get_webview_window("overlay") {
         configure_overlay(&overlay)?;
+        for chrome in overlay_chrome::create(app.handle(), &overlay)? {
+            configure_chrome(&chrome)?;
+        }
+        let handle = app.handle().clone();
+        // AppKit moves a child window with its parent; repositioning it again on every
+        // move only makes it stutter. Windows offers no such coupling.
+        overlay.on_window_event(move |event| {
+            let follow = match event {
+                tauri::WindowEvent::Resized(_) => true,
+                tauri::WindowEvent::Moved(_) => !cfg!(target_os = "macos"),
+                _ => return,
+            };
+            if follow {
+                overlay_chrome::place(&handle);
+            } else {
+                super::overlay_pointer::refresh_overlay_bounds(&handle);
+            }
+        });
+        #[cfg(target_os = "macos")]
+        super::overlay_pointer::watch_cursor(app.handle());
     }
     Ok(())
 }
@@ -225,7 +246,7 @@ fn configure_overlay(window: &WebviewWindow) -> tauri::Result<()> {
     use tauri_nspanel::{CollectionBehavior, StyleMask, WebviewWindowExt};
 
     let panel = window.to_panel::<SubtitlePanel>()?;
-    panel.set_style_mask(StyleMask::empty().nonactivating_panel().resizable().into());
+    panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
     panel.set_collection_behavior(
         CollectionBehavior::new()
             .can_join_all_spaces()
@@ -238,6 +259,74 @@ fn configure_overlay(window: &WebviewWindow) -> tauri::Result<()> {
     Ok(())
 }
 
+/// The same non-activating panel as the subtitles, so clicking a control never brings
+/// the app forward or steals focus from whatever is being watched.
+#[cfg(target_os = "macos")]
+fn configure_chrome(window: &WebviewWindow) -> tauri::Result<()> {
+    use tauri_nspanel::{CollectionBehavior, StyleMask, WebviewWindowExt};
+
+    let panel = window.to_panel::<SubtitlePanel>()?;
+    panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
+    panel.set_collection_behavior(
+        CollectionBehavior::new()
+            .can_join_all_spaces()
+            .full_screen_auxiliary()
+            .into(),
+    );
+    panel.set_hides_on_deactivate(false);
+    panel.set_works_when_modal(true);
+    unconstrain(window);
+    Ok(())
+}
+
+/// AppKit nudges any window it places back under the menu bar; the control windows hang
+/// off the subtitle box wherever it is, off screen included, so the panel class gets a
+/// `constrainFrameRect:toScreen:` that returns the rect untouched. The subtitle window
+/// shares the class and is freed with it, which is what lets its rim drag it past the
+/// screen's edge. Adding the method to the (dynamically registered) subclass overrides
+/// NSWindow's; a second call for the same class is a no-op.
+#[cfg(target_os = "macos")]
+fn unconstrain(window: &WebviewWindow) {
+    use objc2::encode::Encode;
+    use objc2::runtime::{AnyClass, AnyObject, Sel};
+    use objc2::sel;
+    use objc2_foundation::NSRect;
+
+    unsafe extern "C-unwind" fn keep(
+        _this: *mut AnyObject,
+        _cmd: Sel,
+        rect: NSRect,
+        _screen: *mut AnyObject,
+    ) -> NSRect {
+        rect
+    }
+
+    let Ok(raw_window) = window.ns_window() else {
+        return;
+    };
+    let raw_window = raw_window as usize;
+    let _ = window.run_on_main_thread(move || unsafe {
+        let native_window = &*(raw_window as *mut AnyObject);
+        let class = native_window.class() as *const AnyClass as *mut AnyClass;
+        let types = format!("{}@:{}@\0", NSRect::ENCODING, NSRect::ENCODING);
+        let imp: unsafe extern "C-unwind" fn(
+            *mut AnyObject,
+            Sel,
+            NSRect,
+            *mut AnyObject,
+        ) -> NSRect = keep;
+        objc2::ffi::class_addMethod(
+            class,
+            sel!(constrainFrameRect:toScreen:),
+            std::mem::transmute::<
+                unsafe extern "C-unwind" fn(*mut AnyObject, Sel, NSRect, *mut AnyObject) -> NSRect,
+                unsafe extern "C-unwind" fn(),
+            >(imp),
+            types.as_ptr().cast(),
+        );
+    });
+}
+
 #[cfg(target_os = "macos")]
 fn watch_outside_clicks(window: &WebviewWindow) {
     use block2::RcBlock;
@@ -245,9 +334,9 @@ fn watch_outside_clicks(window: &WebviewWindow) {
     use std::ptr::NonNull;
     use tauri::Emitter;
 
-    let target = window.clone();
+    let app = window.app_handle().clone();
     let handler = RcBlock::new(move |_event: NonNull<NSEvent>| {
-        let _ = target.emit(OUTSIDE_CLICK_EVENT, ());
+        let _ = app.emit_to(overlay_chrome::PANEL_LABEL, OUTSIDE_CLICK_EVENT, ());
     });
     let monitor = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(
         NSEventMask::LeftMouseDown | NSEventMask::RightMouseDown | NSEventMask::OtherMouseDown,
@@ -258,6 +347,11 @@ fn watch_outside_clicks(window: &WebviewWindow) {
 
 #[cfg(not(target_os = "macos"))]
 fn configure_overlay(window: &WebviewWindow) -> tauri::Result<()> {
+    window.set_focusable(false)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn configure_chrome(window: &WebviewWindow) -> tauri::Result<()> {
     window.set_focusable(false)
 }
 

@@ -84,6 +84,9 @@ pub fn run() {
             autostart::set_autostart_enabled,
             autostart::open_autostart_settings,
             shell::overlay_pointer::set_overlay_interactive_height,
+            shell::overlay_chrome::set_overlay_settings_open,
+            shell::overlay_chrome::set_overlay_chrome_size,
+            shell::overlay_chrome::drag_overlay,
             controller::controller_action,
             controller::subscribe_controller,
         ])
