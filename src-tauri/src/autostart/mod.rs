@@ -21,6 +21,8 @@ pub enum AutostartStatus {
     Enabled,
     Disabled,
     /// The user switched the item off in System Settings; only they can turn it back on.
+    /// Only macOS reports it, but the frontend handles it everywhere.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     RequiresApproval,
 }
 
