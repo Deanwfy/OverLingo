@@ -47,8 +47,11 @@ pub struct TrayPresentation {
 
 pub fn install(app: &mut App, locale: &str) -> tauri::Result<()> {
     #[cfg(target_os = "macos")]
-    app.handle()
-        .set_activation_policy(tauri::ActivationPolicy::Accessory)?;
+    {
+        app.handle()
+            .set_activation_policy(tauri::ActivationPolicy::Accessory)?;
+        forward_menu_shortcuts();
+    }
 
     let labels = labels(&resolve_locale(locale));
     let version = app.package_info().version.to_string();
@@ -322,6 +325,42 @@ fn unconstrain(window: &WebviewWindow) {
             types.as_ptr().cast(),
         );
     });
+}
+
+/// AppKit stops handing Cmd shortcuts to the main menu once the app is an accessory, so
+/// nothing reaches the Edit items behind Cmd+C, Cmd+V and friends. The event is offered to
+/// the menu here instead, and swallowed when an item takes it.
+#[cfg(target_os = "macos")]
+fn forward_menu_shortcuts() {
+    use block2::RcBlock;
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{NSApplication, NSEvent, NSEventMask, NSEventModifierFlags};
+    use std::ptr::NonNull;
+
+    let handler = RcBlock::new(|event: NonNull<NSEvent>| -> *mut NSEvent {
+        let pass = event.as_ptr();
+        let event = unsafe { event.as_ref() };
+        if !event
+            .modifierFlags()
+            .contains(NSEventModifierFlags::Command)
+        {
+            return pass;
+        }
+        let taken = MainThreadMarker::new()
+            .and_then(|marker| NSApplication::sharedApplication(marker).mainMenu())
+            .is_some_and(|menu| menu.performKeyEquivalent(event));
+        if taken {
+            std::ptr::null_mut()
+        } else {
+            pass
+        }
+    });
+    unsafe {
+        std::mem::forget(NSEvent::addLocalMonitorForEventsMatchingMask_handler(
+            NSEventMask::KeyDown,
+            &handler,
+        ));
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
