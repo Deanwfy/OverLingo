@@ -1,8 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use tauri::{
-    AppHandle, Emitter, LogicalPosition, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 /// The toolbar and the settings panel are separate windows attached to the overlay, so
 /// they stay above it and follow it. Keeping them out of the subtitle window lets the
@@ -13,8 +11,10 @@ pub const PANEL_LABEL: &str = "overlay-panel";
 pub const LABELS: [&str; 2] = [TOOLBAR_LABEL, PANEL_LABEL];
 pub const OVERLAY_LABEL: &str = "overlay";
 const SETTINGS_OPEN_EVENT: &str = "overlay://settings-open";
-/// Mirrors the overlay window's minimum size in tauri.conf.json; resizing is done here,
-/// not by the window system, so the bounds have to be enforced here too.
+/// A press anywhere but on the controls: the panel closes on it like a popover.
+pub const OUTSIDE_CLICK_EVENT: &str = "overlay://outside-click";
+/// Mirrors the overlay window's minimum size in tauri.conf.json, in CSS pixels; resizing
+/// is done here, not by the window system, so the bounds have to be enforced here too.
 const MIN_WIDTH: f64 = 520.0;
 const MIN_HEIGHT: f64 = 140.0;
 
@@ -78,7 +78,8 @@ impl Edge {
     }
 }
 
-/// Logical content sizes reported by the toolbar and panel webviews, in `LABELS` order.
+/// Content sizes reported by the toolbar and panel webviews, in `LABELS` order, in
+/// CSS pixels.
 static SIZES: Mutex<[(f64, f64); 2]> = Mutex::new([(0.0, 0.0); 2]);
 static PANEL_OPEN: AtomicBool = AtomicBool::new(false);
 /// A drag from one of the overlay's handles: the pointer watcher moves the box on every
@@ -93,17 +94,46 @@ struct Drag {
 
 static DRAG: Mutex<Option<Drag>> = Mutex::new(None);
 
-/// The window's outer bounds in logical screen coordinates.
+/// The window's outer bounds in screen coordinates.
 pub fn bounds(window: &WebviewWindow) -> Option<Rect> {
-    let scale = window.scale_factor().ok()?;
-    let position = window.outer_position().ok()?.to_logical::<f64>(scale);
-    let size = window.outer_size().ok()?.to_logical::<f64>(scale);
+    let position = window.outer_position().ok()?;
+    let size = window.outer_size().ok()?;
+    let (x, y) = to_screen(window, f64::from(position.x), f64::from(position.y));
+    let (width, height) = to_screen(window, f64::from(size.width), f64::from(size.height));
     Some(Rect {
-        x: position.x,
-        y: position.y,
-        width: size.width,
-        height: size.height,
+        x,
+        y,
+        width,
+        height,
     })
+}
+
+/// Physical pixels, as the window system reports positions and sizes, to screen
+/// coordinates. Those are points on macOS, where AppKit's global space is logical, and
+/// physical pixels on Windows, where monitors of different scale share only the
+/// physical grid: a logical value there is only meaningful together with the window
+/// it was scaled for, and windows change scale as they move.
+#[cfg(target_os = "macos")]
+pub fn to_screen(window: &WebviewWindow, x: f64, y: f64) -> (f64, f64) {
+    let scale = window.scale_factor().unwrap_or(1.0);
+    (x / scale, y / scale)
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn to_screen(_window: &WebviewWindow, x: f64, y: f64) -> (f64, f64) {
+    (x, y)
+}
+
+/// Screen units per CSS pixel of the window's webview, for sizes and slack that are
+/// measured in CSS pixels.
+#[cfg(target_os = "macos")]
+pub fn screen_scale(_window: &WebviewWindow) -> f64 {
+    1.0
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn screen_scale(window: &WebviewWindow) -> f64 {
+    window.scale_factor().unwrap_or(1.0)
 }
 
 /// On macOS a child window is ordered in whenever its parent is, so the windows are
@@ -185,35 +215,33 @@ pub fn drag_overlay(app: AppHandle, edge: Option<String>, begin: bool) {
     let Some(overlay) = app.get_webview_window(OVERLAY_LABEL) else {
         return;
     };
-    let Ok(mut drag) = DRAG.lock() else {
-        return;
+    // Window queries from a command wait on the main thread, which may itself be in a
+    // cursor callback waiting for `DRAG`, so the lock is only taken once they are done.
+    let next = if begin {
+        let (Some(origin), Ok(cursor)) = (bounds(&overlay), app.cursor_position()) else {
+            return;
+        };
+        Some(Drag {
+            edge: edge.as_deref().map(Edge::named),
+            origin,
+            cursor: to_screen(&overlay, cursor.x, cursor.y),
+        })
+    } else {
+        None
     };
-    if !begin {
-        *drag = None;
-        drop(drag);
-        place(&app);
-        return;
+    if let Ok(mut drag) = DRAG.lock() {
+        *drag = next;
     }
-    let (Some(origin), Ok(cursor), Ok(scale)) = (
-        bounds(&overlay),
-        app.cursor_position(),
-        overlay.scale_factor(),
-    ) else {
-        return;
-    };
-    let cursor = cursor.to_logical::<f64>(scale);
-    *drag = Some(Drag {
-        edge: edge.as_deref().map(Edge::named),
-        origin,
-        cursor: (cursor.x, cursor.y),
-    });
+    if !begin {
+        place(&app);
+    }
 }
 
 pub fn dragging() -> bool {
     DRAG.lock().is_ok_and(|drag| drag.is_some())
 }
 
-/// `x`, `y`: the cursor in logical screen coordinates.
+/// `x`, `y`: the cursor in screen coordinates.
 pub fn drag_to(app: &AppHandle, x: f64, y: f64) {
     let Some(drag) = DRAG.lock().ok().and_then(|drag| *drag) else {
         return;
@@ -223,28 +251,29 @@ pub fn drag_to(app: &AppHandle, x: f64, y: f64) {
     };
     let (dx, dy) = (x - drag.cursor.0, y - drag.cursor.1);
     match drag.edge {
-        None => {
-            let _ =
-                overlay.set_position(LogicalPosition::new(drag.origin.x + dx, drag.origin.y + dy));
+        None => set_origin(&overlay, drag.origin.x + dx, drag.origin.y + dy),
+        Some(edge) => {
+            let scale = screen_scale(&overlay);
+            let min = (MIN_WIDTH * scale, MIN_HEIGHT * scale);
+            set_frame(&overlay, resized(drag.origin, edge, dx, dy, min));
         }
-        Some(edge) => set_frame(&overlay, resized(drag.origin, edge, dx, dy)),
     }
 }
 
-fn resized(start: Rect, edge: Edge, dx: f64, dy: f64) -> Rect {
+fn resized(start: Rect, edge: Edge, dx: f64, dy: f64, min: (f64, f64)) -> Rect {
     let mut frame = start;
     if edge.east {
-        frame.width = (start.width + dx).max(MIN_WIDTH);
+        frame.width = (start.width + dx).max(min.0);
     }
     if edge.west {
-        frame.width = (start.width - dx).max(MIN_WIDTH);
+        frame.width = (start.width - dx).max(min.0);
         frame.x = start.x + start.width - frame.width;
     }
     if edge.south {
-        frame.height = (start.height + dy).max(MIN_HEIGHT);
+        frame.height = (start.height + dy).max(min.1);
     }
     if edge.north {
-        frame.height = (start.height - dy).max(MIN_HEIGHT);
+        frame.height = (start.height - dy).max(min.1);
         frame.y = start.y + start.height - frame.height;
     }
     frame
@@ -349,28 +378,37 @@ fn place_all(app: &AppHandle, move_panel: bool) {
     };
     let sizes = SIZES.lock().map(|sizes| *sizes).unwrap_or_default();
     let work_area = overlay.current_monitor().ok().flatten().map(|monitor| {
-        let scale = monitor.scale_factor();
+        let scale = if cfg!(target_os = "macos") {
+            monitor.scale_factor()
+        } else {
+            1.0
+        };
         let area = monitor.work_area();
-        let position = area.position.to_logical::<f64>(scale);
-        let extent = area.size.to_logical::<f64>(scale);
         Rect {
-            x: position.x,
-            y: position.y,
-            width: extent.width,
-            height: extent.height,
+            x: f64::from(area.position.x) / scale,
+            y: f64::from(area.position.y) / scale,
+            width: f64::from(area.size.width) / scale,
+            height: f64::from(area.size.height) / scale,
         }
     });
+    // The webviews report CSS pixels; each window is scaled by its own monitor.
+    let scaled = |window: &Option<WebviewWindow>, (width, height): (f64, f64)| {
+        let scale = window.as_ref().map_or(1.0, screen_scale);
+        (width * scale, height * scale)
+    };
+    let toolbar = app.get_webview_window(TOOLBAR_LABEL);
+    let panel = app.get_webview_window(PANEL_LABEL);
     let [toolbar_size, panel_size] = sizes;
-    let toolbar_frame = toolbar_frame(subtitle_box, toolbar_size);
-    let panel_frame = panel_frame(toolbar_frame, panel_size, work_area);
+    let toolbar_frame = toolbar_frame(subtitle_box, scaled(&toolbar, toolbar_size));
+    let panel_frame = panel_frame(toolbar_frame, scaled(&panel, panel_size), work_area);
     let mut frames = ChromeFrames::default();
-    if let Some(toolbar) = app.get_webview_window(TOOLBAR_LABEL) {
+    if let Some(toolbar) = toolbar {
         if toolbar_frame.width > 0.0 && toolbar_frame.height > 0.0 {
             set_frame(&toolbar, toolbar_frame);
             frames.toolbar = Some(toolbar_frame);
         }
     }
-    if let Some(panel) = app.get_webview_window(PANEL_LABEL) {
+    if let Some(panel) = panel {
         if move_panel && panel_frame.width > 0.0 && panel_frame.height > 0.0 {
             set_frame(&panel, panel_frame);
             if panel_open() {
@@ -414,8 +452,24 @@ pub fn set_frame(window: &WebviewWindow, frame: Rect) {
 
 #[cfg(not(target_os = "macos"))]
 pub fn set_frame(window: &WebviewWindow, frame: Rect) {
-    let _ = window.set_size(tauri::LogicalSize::new(frame.width, frame.height));
-    let _ = window.set_position(LogicalPosition::new(frame.x, frame.y));
+    let _ = window.set_size(tauri::PhysicalSize::new(
+        frame.width.round() as u32,
+        frame.height.round() as u32,
+    ));
+    set_origin(window, frame.x, frame.y);
+}
+
+#[cfg(target_os = "macos")]
+fn set_origin(window: &WebviewWindow, x: f64, y: f64) {
+    let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+}
+
+#[cfg(not(target_os = "macos"))]
+fn set_origin(window: &WebviewWindow, x: f64, y: f64) {
+    let _ = window.set_position(tauri::PhysicalPosition::new(
+        x.round() as i32,
+        y.round() as i32,
+    ));
 }
 
 /// Always hangs off the box's top-right corner, even off screen: the box itself can be
@@ -466,6 +520,7 @@ mod tests {
     };
     const TOOLBAR: (f64, f64) = (240.0, 40.0);
     const PANEL: (f64, f64) = (608.0, 328.0);
+    const MIN: (f64, f64) = (MIN_WIDTH, MIN_HEIGHT);
 
     #[test]
     fn hangs_the_toolbar_off_the_top_right_corner() {
@@ -504,16 +559,16 @@ mod tests {
 
     #[test]
     fn resizes_from_any_edge_and_keeps_the_opposite_one() {
-        let east = resized(BOX, Edge::named("e"), 50.0, 0.0);
+        let east = resized(BOX, Edge::named("e"), 50.0, 0.0, MIN);
         assert_eq!((east.x, east.width), (100.0, 850.0));
-        let west = resized(BOX, Edge::named("w"), 50.0, 0.0);
+        let west = resized(BOX, Edge::named("w"), 50.0, 0.0, MIN);
         assert_eq!((west.x, west.width), (150.0, 750.0));
-        let corner = resized(BOX, Edge::named("nw"), -20.0, -30.0);
+        let corner = resized(BOX, Edge::named("nw"), -20.0, -30.0, MIN);
         assert_eq!((corner.x, corner.y), (80.0, 570.0));
         assert_eq!((corner.width, corner.height), (820.0, 230.0));
-        let small = resized(BOX, Edge::named("se"), -900.0, -900.0);
+        let small = resized(BOX, Edge::named("se"), -900.0, -900.0, MIN);
         assert_eq!((small.width, small.height), (MIN_WIDTH, MIN_HEIGHT));
-        let pinned = resized(BOX, Edge::named("nw"), 900.0, 900.0);
+        let pinned = resized(BOX, Edge::named("nw"), 900.0, 900.0, MIN);
         assert_eq!(pinned.x + pinned.width, 900.0);
         assert_eq!(pinned.y + pinned.height, 800.0);
     }

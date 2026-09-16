@@ -13,8 +13,6 @@ const OVERLAY_ID: &str = "toggle-overlay";
 const UPDATE_ID: &str = "check-update";
 const QUIT_ID: &str = "quit";
 const RELEASES_URL: &str = "https://github.com/Deanwfy/OverLingo/releases/latest";
-#[cfg(target_os = "macos")]
-const OUTSIDE_CLICK_EVENT: &str = "overlay://outside-click";
 
 #[cfg(target_os = "macos")]
 tauri_nspanel::tauri_panel! {
@@ -140,7 +138,7 @@ pub fn install(app: &mut App, locale: &str) -> tauri::Result<()> {
                 super::overlay_pointer::refresh_overlay_bounds(&handle);
             }
         });
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
         super::overlay_pointer::watch_cursor(app.handle());
     }
     Ok(())
@@ -255,7 +253,6 @@ fn configure_overlay(window: &WebviewWindow) -> tauri::Result<()> {
     );
     panel.set_hides_on_deactivate(false);
     panel.set_works_when_modal(true);
-    watch_outside_clicks(window);
     Ok(())
 }
 
@@ -325,24 +322,6 @@ fn unconstrain(window: &WebviewWindow) {
             types.as_ptr().cast(),
         );
     });
-}
-
-#[cfg(target_os = "macos")]
-fn watch_outside_clicks(window: &WebviewWindow) {
-    use block2::RcBlock;
-    use objc2_app_kit::{NSEvent, NSEventMask};
-    use std::ptr::NonNull;
-    use tauri::Emitter;
-
-    let app = window.app_handle().clone();
-    let handler = RcBlock::new(move |_event: NonNull<NSEvent>| {
-        let _ = app.emit_to(overlay_chrome::PANEL_LABEL, OUTSIDE_CLICK_EVENT, ());
-    });
-    let monitor = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(
-        NSEventMask::LeftMouseDown | NSEventMask::RightMouseDown | NSEventMask::OtherMouseDown,
-        &handler,
-    );
-    std::mem::forget(monitor);
 }
 
 #[cfg(not(target_os = "macos"))]
