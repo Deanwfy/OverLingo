@@ -2,21 +2,13 @@
     import { formatDuration } from '../app/format';
     import type { ControllerSnapshot, OverlayAction, OverlaySettingsPatch } from '../app/types';
     import { t } from '../core/locale.svelte';
-    import { sendControllerAction } from '../core/runtime.js';
+    import { dragOverlay, sendControllerAction } from '../core/runtime.js';
     import Icon from './Icon.svelte';
 
-    let {
-        state,
-        settingsOpen = $bindable(false),
-        chromeElement = $bindable(null),
-        toolbarElement = $bindable(null),
-        send,
-        update,
-    }: {
+    let { state, settingsOpen, onToggleSettings, send, update }: {
         state: ControllerSnapshot;
-        settingsOpen?: boolean;
-        chromeElement?: HTMLElement | null;
-        toolbarElement?: HTMLElement | null;
+        settingsOpen: boolean;
+        onToggleSettings: () => void;
         send: (action: OverlayAction) => void;
         update: (patch: OverlaySettingsPatch) => void;
     } = $props();
@@ -33,11 +25,6 @@
         update({ alwaysOnTop: enabled });
     }
 
-    function toggleSettings() {
-        settingsOpen = !settingsOpen;
-        if (settingsOpen) send({ type: 'requestCaptureOptions' });
-    }
-
     function controlTranslation() {
         const command = state.translationState === 'paused'
             ? 'resume'
@@ -50,11 +37,35 @@
     async function hideOverlayWindow() {
         await sendControllerAction({ type: 'hide' });
     }
+
+    // Pressing between the buttons moves the subtitle window, not this one: the backend
+    // follows the cursor until release and lets this window ride along.
+    let dragging = false;
+
+    function beginDrag(event: PointerEvent) {
+        if (event.button !== 0 || (event.target as Element).closest('button')) return;
+        event.preventDefault();
+        (event.currentTarget as Element).setPointerCapture(event.pointerId);
+        dragging = true;
+        void dragOverlay(true);
+    }
+
+    function endDrag() {
+        if (!dragging) return;
+        dragging = false;
+        void dragOverlay(false);
+    }
 </script>
 
-<header class="overlay-chrome overlay-reveal" bind:this={chromeElement}>
-    <div class="drag-surface" data-tauri-drag-region></div>
-    <nav aria-label={t('overlayControls')} bind:this={toolbarElement}>
+<header
+    class="overlay-chrome"
+    role="group"
+    aria-label={t('moveOverlay')}
+    onpointerdown={beginDrag}
+    onpointerup={endDrag}
+    onpointercancel={endDrag}
+>
+    <nav aria-label={t('overlayControls')}>
         <button
             class="translation-control"
             class:running={state.translationState === 'running'}
@@ -88,7 +99,7 @@
             title={t('overlaySettings')}
             aria-label={t('overlaySettings')}
             aria-expanded={settingsOpen}
-            onclick={toggleSettings}
+            onclick={onToggleSettings}
         ><Icon name="settings" size={15} /></button>
         <button
             class="close-overlay"

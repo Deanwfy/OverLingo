@@ -79,6 +79,8 @@ export default {
     overlayControls: 'Điều khiển phụ đề',
     overlaySettings: 'Cài đặt phụ đề',
     hideOverlay: 'Ẩn phụ đề',
+    moveOverlay: 'Di chuyển phụ đề',
+    resizeOverlay: 'Đổi kích thước phụ đề',
     emptyOverlay: 'Phụ đề sẽ xuất hiện ở đây',
     pinOverlay: 'Luôn ở trên cùng',
     unpinOverlay: 'Bỏ luôn ở trên cùng',

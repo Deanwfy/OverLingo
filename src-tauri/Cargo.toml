@@ -38,8 +38,8 @@ tauri-plugin-dialog = "2.7.2"
 keyring = { version = "3.6.3", default-features = false, features = ["apple-native"] }
 objc2 = "0.6"
 block2 = "0.6"
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "block2", "NSApplication", "NSEvent", "NSRunningApplication", "NSWindow", "NSWorkspace"] }
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSDictionary", "NSError", "NSString", "NSUUID", "NSValue"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "block2", "NSApplication", "NSEvent", "NSGraphics", "NSRunningApplication", "NSScreen", "NSWindow", "NSWorkspace"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSDictionary", "NSError", "NSGeometry", "NSString", "NSUUID", "NSValue"] }
 objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFBase", "CFDictionary", "CFString", "objc2"] }
 objc2-core-audio = { version = "0.3.2", default-features = false, features = ["std", "AudioHardware", "block2", "dispatch2", "objc2", "objc2-core-audio-types", "objc2-foundation"] }
 objc2-core-audio-types = { version = "0.3.2", default-features = false, features = ["std", "CoreAudioBaseTypes"] }
@@ -55,4 +55,5 @@ windows = { version = "0.58", features = [
   "Win32_Media_Audio",
   "Win32_System_Com",
   "Win32_Foundation",
+  "Win32_UI_WindowsAndMessaging",
 ] }
