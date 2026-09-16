@@ -48,11 +48,17 @@
         };
     });
 
-    // The window is sized to the content, so every change in it is reported.
+    // The window is sized to the content, so every change in it is reported; the
+    // toolbar also says where its settings button is, for the panel to hang under it.
     $effect(() => {
         if (!shell) return;
         const observer = new ResizeObserver(() => {
-            void setOverlayChromeSize({ width: shell!.offsetWidth, height: shell!.offsetHeight });
+            const button = shell!.querySelector<HTMLElement>('button[aria-expanded]');
+            void setOverlayChromeSize({
+                width: shell!.offsetWidth,
+                height: shell!.offsetHeight,
+                anchor: button ? button.offsetLeft + button.offsetWidth / 2 : undefined,
+            });
         });
         observer.observe(shell);
         return () => observer.disconnect();

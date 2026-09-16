@@ -14,7 +14,7 @@ export function onOverlayPointerAt(
 ): Promise<() => void>;
 export function setOverlayInteractiveHeight(height: number): Promise<void>;
 export function setOverlaySettingsOpen(open: boolean): Promise<void>;
-export function setOverlayChromeSize(size: { width: number; height: number }): Promise<void>;
+export function setOverlayChromeSize(size: { width: number; height: number; anchor?: number }): Promise<void>;
 export function dragOverlay(begin: boolean, edge?: string | null): Promise<void>;
 export function onOverlaySettingsOpen(handler: (open: boolean) => void): Promise<() => void>;
 export function dismissOverlayChrome(): Promise<void>;

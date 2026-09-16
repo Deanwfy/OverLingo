@@ -81,6 +81,8 @@ impl Edge {
 /// Content sizes reported by the toolbar and panel webviews, in `LABELS` order, in
 /// CSS pixels.
 static SIZES: Mutex<[(f64, f64); 2]> = Mutex::new([(0.0, 0.0); 2]);
+/// The centre of the toolbar's settings button, in CSS pixels from the toolbar's left.
+static SETTINGS_ANCHOR: Mutex<f64> = Mutex::new(0.0);
 static PANEL_OPEN: AtomicBool = AtomicBool::new(false);
 /// A drag from one of the overlay's handles: the pointer watcher moves the box on every
 /// cursor event, so the webview's own idea of screen coordinates never enters into it.
@@ -176,12 +178,20 @@ pub fn set_overlay_settings_open(app: AppHandle, open: bool) {
 }
 
 #[tauri::command]
-pub fn set_overlay_chrome_size(window: WebviewWindow, width: f64, height: f64) {
+pub fn set_overlay_chrome_size(
+    window: WebviewWindow,
+    width: f64,
+    height: f64,
+    anchor: Option<f64>,
+) {
     let Some(index) = LABELS.iter().position(|label| *label == window.label()) else {
         return;
     };
     if let Ok(mut sizes) = SIZES.lock() {
         sizes[index] = (width, height);
+    }
+    if let (Some(anchor), Ok(mut settings_anchor)) = (anchor, SETTINGS_ANCHOR.lock()) {
+        *settings_anchor = anchor;
     }
     place(window.app_handle());
 }
@@ -377,6 +387,10 @@ fn place_all(app: &AppHandle, move_panel: bool) {
         return;
     };
     let sizes = SIZES.lock().map(|sizes| *sizes).unwrap_or_default();
+    let anchor = SETTINGS_ANCHOR
+        .lock()
+        .map(|anchor| *anchor)
+        .unwrap_or_default();
     let work_area = overlay.current_monitor().ok().flatten().map(|monitor| {
         let scale = if cfg!(target_os = "macos") {
             monitor.scale_factor()
@@ -400,7 +414,8 @@ fn place_all(app: &AppHandle, move_panel: bool) {
     let panel = app.get_webview_window(PANEL_LABEL);
     let [toolbar_size, panel_size] = sizes;
     let toolbar_frame = toolbar_frame(subtitle_box, scaled(&toolbar, toolbar_size));
-    let panel_frame = panel_frame(toolbar_frame, scaled(&panel, panel_size), work_area);
+    let anchor = toolbar_frame.x + anchor * toolbar.as_ref().map_or(1.0, screen_scale);
+    let panel_frame = panel_frame(toolbar_frame, anchor, scaled(&panel, panel_size), work_area);
     let mut frames = ChromeFrames::default();
     if let Some(toolbar) = toolbar {
         if toolbar_frame.width > 0.0 && toolbar_frame.height > 0.0 {
@@ -483,11 +498,20 @@ fn toolbar_frame(subtitle_box: Rect, (width, height): (f64, f64)) -> Rect {
     }
 }
 
-/// A dropdown on the toolbar: right-aligned with it, below it like any menu, above it
-/// only when the screen ends too soon, never off the left edge.
-fn panel_frame(toolbar: Rect, (width, height): (f64, f64), work_area: Option<Rect>) -> Rect {
+/// A popover on the settings button, hung with a third of its width to the right of
+/// the button (`anchor` is the button's centre in screen coordinates): the button sits
+/// at the end of the toolbar, so centring would push the panel well past the box on a
+/// laptop screen. Pushed back inside the screen at either side, above the toolbar only
+/// when the screen ends too soon.
+fn panel_frame(
+    toolbar: Rect,
+    anchor: f64,
+    (width, height): (f64, f64),
+    work_area: Option<Rect>,
+) -> Rect {
     let bottom = work_area.map_or(f64::MAX, |area| area.y + area.height);
     let left = work_area.map_or(f64::MIN, |area| area.x);
+    let right = work_area.map_or(f64::MAX, |area| area.x + area.width);
     let below = toolbar.y + toolbar.height;
     let y = if below + height <= bottom {
         below
@@ -495,7 +519,7 @@ fn panel_frame(toolbar: Rect, (width, height): (f64, f64), work_area: Option<Rec
         toolbar.y - height
     };
     Rect {
-        x: (toolbar.x + toolbar.width - width).max(left),
+        x: (anchor - width * 2.0 / 3.0).min(right - width).max(left),
         y,
         width,
         height,
@@ -521,6 +545,8 @@ mod tests {
     const TOOLBAR: (f64, f64) = (240.0, 40.0);
     const PANEL: (f64, f64) = (608.0, 328.0);
     const MIN: (f64, f64) = (MIN_WIDTH, MIN_HEIGHT);
+    /// The settings button's centre, from the toolbar's left edge.
+    const ANCHOR: f64 = 200.0;
 
     #[test]
     fn hangs_the_toolbar_off_the_top_right_corner() {
@@ -531,16 +557,16 @@ mod tests {
     }
 
     #[test]
-    fn opens_the_panel_below_the_toolbar_when_it_fits() {
+    fn hangs_the_panel_two_thirds_left_of_the_settings_button() {
         let toolbar = toolbar_frame(Rect { y: 200.0, ..BOX }, TOOLBAR);
-        let panel = panel_frame(toolbar, PANEL, Some(SCREEN));
-        assert_eq!((panel.x, panel.y), (292.0, 200.0));
+        let panel = panel_frame(toolbar, toolbar.x + ANCHOR, PANEL, Some(SCREEN));
+        assert_eq!((panel.x, panel.y), (860.0 - 608.0 * 2.0 / 3.0, 200.0));
     }
 
     #[test]
     fn opens_the_panel_above_the_toolbar_near_the_bottom() {
         let toolbar = toolbar_frame(Rect { y: 800.0, ..BOX }, TOOLBAR);
-        let panel = panel_frame(toolbar, PANEL, Some(SCREEN));
+        let panel = panel_frame(toolbar, toolbar.x + ANCHOR, PANEL, Some(SCREEN));
         assert_eq!(panel.y, 760.0 - 328.0);
     }
 
@@ -554,7 +580,15 @@ mod tests {
             },
             TOOLBAR,
         );
-        assert_eq!(panel_frame(toolbar, PANEL, Some(SCREEN)).x, 0.0);
+        let panel = panel_frame(toolbar, toolbar.x + ANCHOR, PANEL, Some(SCREEN));
+        assert_eq!(panel.x, 0.0);
+    }
+
+    #[test]
+    fn keeps_the_panel_on_screen_on_the_right() {
+        let toolbar = toolbar_frame(Rect { x: 600.0, ..BOX }, TOOLBAR);
+        let panel = panel_frame(toolbar, toolbar.x + ANCHOR, PANEL, Some(SCREEN));
+        assert_eq!(panel.x + panel.width, SCREEN.width);
     }
 
     #[test]

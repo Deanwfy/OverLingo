@@ -58,8 +58,8 @@ export async function setOverlaySettingsOpen(open) {
     if (native) await invokeNative('set_overlay_settings_open', { open });
 }
 
-export async function setOverlayChromeSize({ width, height }) {
-    if (native) await invokeNative('set_overlay_chrome_size', { width, height });
+export async function setOverlayChromeSize({ width, height, anchor }) {
+    if (native) await invokeNative('set_overlay_chrome_size', { width, height, anchor });
 }
 
 // Moves the subtitle window, or resizes it from a corner (`ne`, ...); the backend
