@@ -158,10 +158,6 @@ pub(crate) fn engine_of(model: &str) -> Option<&'static str> {
     translator(model).map(|entry| entry.engine)
 }
 
-pub(crate) fn default_engine() -> &'static str {
-    ENGINES[0].id
-}
-
 pub(crate) fn is_known_engine(id: &str) -> bool {
     engine(id).is_some()
 }
@@ -177,16 +173,17 @@ pub(crate) fn settings_fingerprint(id: &str, config: &AppConfig) -> String {
     engine(id).map_or_else(String::new, |entry| (entry.fingerprint)(config))
 }
 
-/// An unknown engine is treated as unusable rather than allowed through.
+/// A route has no translator until a known engine with a key is chosen: an unknown engine
+/// and a missing key read the same to the user, since the picker only offers keyed ones.
 pub(crate) fn start_blocker(
     id: &str,
     config: &AppConfig,
     credentials: &CredentialStore,
 ) -> Option<&'static str> {
     let Some(entry) = engine(id) else {
-        return Some("missingCredential");
+        return Some("noTranslator");
     };
-    (entry.blocker)(config).or_else(|| (!credentials.has(id)).then_some("missingCredential"))
+    (entry.blocker)(config).or_else(|| (!credentials.has(id)).then_some("noTranslator"))
 }
 
 /// Why a route cannot run as configured, if anything. The picker deliberately lets the user
@@ -197,6 +194,9 @@ pub(crate) fn route_config_error(
     source_language: &str,
     target_language: &str,
 ) -> Option<&'static str> {
+    if translator(model).is_none() {
+        return Some("noTranslator");
+    }
     if source_language == target_language {
         return Some("invalidLanguagePair");
     }
@@ -287,7 +287,7 @@ mod tests {
         config.qwen.workspace_id = "ws-123".into();
         assert_eq!(
             start_blocker("qwen", &config, &credentials),
-            Some("missingCredential")
+            Some("noTranslator")
         );
 
         credentials.set_for_test("qwen", "sk-test");
@@ -295,7 +295,7 @@ mod tests {
         // Qwen's workspace requirement must not leak onto other engines.
         assert_eq!(
             start_blocker("openai", &AppConfig::default(), &credentials),
-            Some("missingCredential")
+            Some("noTranslator")
         );
     }
 
@@ -336,15 +336,17 @@ mod tests {
         assert_eq!(route_config_error(qwen, "yue", "en"), None);
     }
 
-    /// A model nobody recognises must not fall through to the "accepts any language" case.
+    /// A model nobody recognises must not fall through to the "accepts any language" case,
+    /// and a route that never got one is held back the same way.
     #[test]
-    fn retired_models_are_unknown() {
+    fn a_route_needs_a_known_model() {
         let retired = "qwen3-livetranslate-flash-realtime";
         assert_eq!(engine_of(retired), None);
         assert_eq!(
             route_config_error(retired, "en", "zh"),
-            Some("unsupportedLanguage")
+            Some("noTranslator")
         );
+        assert_eq!(route_config_error("", "en", "zh"), Some("noTranslator"));
     }
 
     #[test]

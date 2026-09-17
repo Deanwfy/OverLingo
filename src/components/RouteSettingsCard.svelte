@@ -20,27 +20,21 @@
     let configured = $derived(
         translators().filter(entry => state.credentials[entry.provider]),
     );
+    // A translator whose key went missing behind the app's back (or whose keychain could
+    // not be read) is shown as none yet; the stored choice comes back with the key.
+    let selectedModel = $derived(
+        state.credentials[translator(route.model)?.provider ?? ''] ? route.model : '',
+    );
 
     // Holding a key is not part of the route, so hiding a translator without one costs no
     // reachability — the user adds the key first either way. Lacking the route's languages
     // is a relation between route fields, so those stay selectable and merely say so;
     // forbidding them would strand any pair the current translator cannot serve.
     function translatorOptions(route: RouteConfig) {
-        if (!configured.length) {
-            return [{ id: route.model, name: t('noTranslator') }];
-        }
-        const options = configured.map(entry => ({
+        return configured.map(entry => ({
             id: entry.id,
             name: entry.name + (supportsPair(entry.id, route) ? '' : ` · ${t('unsupportedLanguages')}`),
         }));
-        // Clearing a key must not leave the select blank on the route still using it.
-        if (!options.some(entry => entry.id === route.model)) {
-            options.push({
-                id: route.model,
-                name: `${translator(route.model)?.name ?? route.model} · ${t('notConfigured')}`,
-            });
-        }
-        return options;
     }
 
     function supportsPair(model: string, route: RouteConfig) {
@@ -203,10 +197,13 @@
         <span>{t('translator')}</span>
         <select
             class="compact"
-            value={route.model}
+            value={selectedModel}
             disabled={!route.enabled || starting || !configured.length}
             onchange={(event) => updateTranslator(event.currentTarget.value)}
         >
+            {#if !selectedModel}
+                <option value="" disabled>{t('noTranslator')}</option>
+            {/if}
             {#each translatorOptions(route) as entry}
                 <option value={entry.id}>{entry.name}</option>
             {/each}

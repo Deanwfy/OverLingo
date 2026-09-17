@@ -18,11 +18,12 @@ pub fn set_provider_credential(
     state: State<'_, CredentialState>,
     controller: State<'_, AppController>,
 ) -> Result<HashMap<String, bool>, String> {
+    let secret = secret.trim();
     let status = {
         let mut store = state.0.lock().map_err(|error| error.to_string())?;
-        store.set(&provider, secret.trim())?;
+        store.set(&provider, secret)?;
         store.status()
     };
-    controller.credentials_changed();
+    controller.credentials_changed(&provider, !secret.is_empty());
     Ok(status)
 }

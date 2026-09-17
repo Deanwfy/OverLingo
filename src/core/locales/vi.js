@@ -93,7 +93,6 @@ export default {
     workspaceRejected: 'Workspace ID, khu vực dịch vụ hoặc quyền truy cập không khớp.',
     providerBusy: 'Trình dịch đang bận hoặc không còn hạn mức. Hãy thử lại sau.',
     networkUnavailable: 'Không thể kết nối trình dịch. Hãy kiểm tra mạng và thử lại.',
-    missingCredential: 'Hãy thêm API Key cho từng trình dịch đang dùng.',
     workspaceRequired: 'Qwen 3.5 cần Workspace ID.',
     chooseAudioSource: 'Hãy bật ít nhất một nguồn âm thanh.',
     chooseApplication: 'Chọn ứng dụng cần lấy âm thanh.',

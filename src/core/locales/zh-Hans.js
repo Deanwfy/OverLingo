@@ -93,7 +93,6 @@ export default {
     workspaceRejected: 'Workspace ID、服务区域或访问权限不匹配。',
     providerBusy: '翻译器正忙或可用额度不足，请稍后再试。',
     networkUnavailable: '无法连接翻译器，请检查网络后再试。',
-    missingCredential: '请先为使用中的翻译器添加 API Key。',
     workspaceRequired: 'Qwen 3.5 需要填写 Workspace ID。',
     chooseAudioSource: '请至少启用一个音频来源。',
     chooseApplication: '请选择系统音频来源。',

@@ -61,9 +61,12 @@ impl AppController {
             .map_err(|_| "Application controller is unavailable".into())
     }
 
-    /// Republishes so surfaces pick up the new set of usable translators.
-    pub fn credentials_changed(&self) {
-        let _ = self.sender.send(Action::CredentialsChanged);
+    /// Surfaces pick up the new set of usable translators, and a cleared key frees its routes.
+    pub fn credentials_changed(&self, provider: &str, present: bool) {
+        let _ = self.sender.send(Action::CredentialsChanged {
+            provider: provider.to_owned(),
+            present,
+        });
     }
 
     fn subscribe(
@@ -128,7 +131,10 @@ enum Action {
         version: u64,
     },
     CaptureOptionsLoaded(Result<(Vec<CapturableApplication>, Vec<String>), String>),
-    CredentialsChanged,
+    CredentialsChanged {
+        provider: String,
+        present: bool,
+    },
     Tick(u64),
 }
 
@@ -221,7 +227,9 @@ impl ControllerActor {
                     }
                     self.publish();
                 }
-                Action::CredentialsChanged => self.publish(),
+                Action::CredentialsChanged { provider, present } => {
+                    self.credentials_changed(&provider, present)
+                }
                 Action::Tick(generation) => self.tick(generation),
             }
         }

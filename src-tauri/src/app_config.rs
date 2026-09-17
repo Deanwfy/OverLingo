@@ -130,8 +130,10 @@ impl Default for RouteConfig {
         Self {
             enabled: true,
             input: "system".into(),
-            engine: "qwen".into(),
-            model: "qwen3.5-livetranslate-flash-realtime".into(),
+            // No translator until the user picks one: a preselected model would look chosen
+            // while its provider has no key.
+            engine: String::new(),
+            model: String::new(),
             source_language: String::new(),
             target_language: String::new(),
         }
@@ -191,6 +193,19 @@ impl AppConfig {
         let bytes = serde_json::to_vec_pretty(&config)
             .map_err(|error| format!("Failed to serialize app config: {error}"))?;
         write_atomic(&path, &bytes)
+    }
+
+    /// Routes on `engine` lose their translator; says whether any did.
+    pub fn drop_engine(&mut self, engine: &str) -> bool {
+        let mut dropped = false;
+        for route in [&mut self.routes.system, &mut self.routes.microphone] {
+            if route.engine == engine {
+                route.model.clear();
+                route.engine.clear();
+                dropped = true;
+            }
+        }
+        dropped
     }
 
     pub fn normalized(mut self) -> Self {
@@ -291,16 +306,14 @@ fn counterpart_language(interface: &str) -> &'static str {
 
 fn normalize_route(route: &mut RouteConfig, input: &str, interface: &str) {
     route.input = input.into();
-    if !crate::translators::is_known_engine(&route.engine) {
-        route.engine = crate::translators::default_engine().into();
-    }
-    // A retired model falls back to its provider's current one, and the engine is then
+    // A retired model falls back to its provider's current one; one nobody recognises
+    // leaves the route without a translator rather than handing it one. The engine is
     // derived from the model so the two can never disagree.
     if crate::translators::engine_of(&route.model).is_none() {
         route.model = crate::translators::default_model(&route.engine).into();
     }
     route.engine = crate::translators::engine_of(&route.model)
-        .unwrap_or_else(crate::translators::default_engine)
+        .unwrap_or_default()
         .into();
     // Subtitles are read in the interface language, and the microphone route is the same
     // exchange the other way round.
@@ -435,6 +448,44 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_route_keeps_its_translator_only_while_the_model_is_known() {
+        let config = AppConfig::default().normalized();
+        assert_eq!(config.routes.system.model, "");
+        assert_eq!(config.routes.system.engine, "");
+
+        let mut retired = AppConfig::default();
+        retired.routes.system.engine = "qwen".into();
+        retired.routes.system.model = "qwen3-livetranslate-flash-realtime".into();
+        let retired = retired.normalized();
+        assert_eq!(
+            retired.routes.system.model,
+            "qwen3.5-livetranslate-flash-realtime"
+        );
+        assert_eq!(retired.routes.system.engine, "qwen");
+
+        let mut unknown = AppConfig::default();
+        unknown.routes.system.engine = "gemini".into();
+        unknown.routes.system.model = "gemini-live".into();
+        let unknown = unknown.normalized();
+        assert_eq!(unknown.routes.system.model, "");
+        assert_eq!(unknown.routes.system.engine, "");
+    }
+
+    #[test]
+    fn clearing_a_key_unsets_the_routes_on_that_translator() {
+        let mut config = AppConfig::default();
+        config.routes.system.model = "qwen3.5-livetranslate-flash-realtime".into();
+        config.routes.microphone.model = "gpt-realtime-translate".into();
+        let mut config = config.normalized();
+
+        assert!(config.drop_engine("qwen"));
+        assert_eq!(config.routes.system.model, "");
+        assert_eq!(config.routes.system.engine, "");
+        assert_eq!(config.routes.microphone.model, "gpt-realtime-translate");
+        assert!(!config.drop_engine("qwen"));
     }
 
     /// Normalize runs on every save, so it must never rewrite a pair the user chose.

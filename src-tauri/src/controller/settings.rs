@@ -91,11 +91,14 @@ impl ControllerActor {
         let target = patch
             .target_language
             .unwrap_or_else(|| route.target_language.clone());
-        // The model picks the provider, so an unknown one is rejected rather than guessed at.
+        // The model picks the provider, so an unknown one is rejected rather than guessed at;
+        // an empty one is a route still waiting for its translator.
         // A language the model cannot handle is stored anyway: the user needs to be able to
         // change translator and language in either order, and only the combination matters.
-        let Some(engine) = engine_of(&model) else {
-            return;
+        let engine = match engine_of(&model) {
+            Some(engine) => engine,
+            None if model.is_empty() => "",
+            None => return,
         };
         route.engine = engine.into();
         route.model = model;
@@ -103,6 +106,15 @@ impl ControllerActor {
         route.target_language = target;
         self.save_config();
         self.reconfigure_if_active();
+        self.publish();
+    }
+
+    /// Only a key cleared in the app unsets its routes. One that goes missing behind the
+    /// app's back may be an unreadable keychain, so the choice is kept for its return.
+    pub(super) fn credentials_changed(&mut self, provider: &str, present: bool) {
+        if !present && self.config.drop_engine(provider) {
+            self.save_config();
+        }
         self.publish();
     }
 

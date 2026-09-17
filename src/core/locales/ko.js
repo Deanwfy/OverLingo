@@ -93,7 +93,6 @@ export default {
     workspaceRejected: 'Workspace ID, 서비스 지역 또는 접근 권한이 일치하지 않습니다.',
     providerBusy: '번역 서비스가 혼잡하거나 사용 한도가 부족합니다. 잠시 후 다시 시도하세요.',
     networkUnavailable: '번역 서비스에 연결할 수 없습니다. 네트워크를 확인한 후 다시 시도하세요.',
-    missingCredential: '사용할 번역 서비스의 API Key를 먼저 추가하세요.',
     workspaceRequired: 'Qwen 3.5에는 Workspace ID가 필요합니다.',
     chooseAudioSource: '오디오를 하나 이상 켜세요.',
     chooseApplication: '오디오를 가져올 앱을 선택하세요.',

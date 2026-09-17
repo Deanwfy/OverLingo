@@ -93,7 +93,6 @@ export default {
     workspaceRejected: 'Workspace ID、サービス地域、またはアクセス権が一致しません。',
     providerBusy: '翻訳サービスが混雑しているか、利用枠が不足しています。しばらくしてから再試行してください。',
     networkUnavailable: '翻訳サービスに接続できません。ネットワークを確認して再試行してください。',
-    missingCredential: '使用する翻訳サービスのAPI Keyを追加してください。',
     workspaceRequired: 'Qwen 3.5にはWorkspace IDが必要です。',
     chooseAudioSource: '音声を1つ以上オンにしてください。',
     chooseApplication: '音声を取得するアプリを選択してください。',

@@ -93,7 +93,6 @@ export default {
     workspaceRejected: 'El ID del espacio de trabajo, la región o el permiso de acceso no coinciden.',
     providerBusy: 'El traductor está ocupado o no tiene cuota disponible. Inténtalo de nuevo más tarde.',
     networkUnavailable: 'No se pudo conectar con el traductor. Comprueba la red y vuelve a intentarlo.',
-    missingCredential: 'Añade primero una clave de API para cada traductor seleccionado.',
     workspaceRequired: 'Qwen 3.5 requiere un ID de espacio de trabajo.',
     chooseAudioSource: 'Activa al menos una fuente de audio.',
     chooseApplication: 'Elige una aplicación de la que capturar audio.',

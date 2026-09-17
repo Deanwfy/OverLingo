@@ -93,7 +93,6 @@ export default {
     workspaceRejected: 'The Workspace ID, region, or access permission does not match.',
     providerBusy: 'The translator is busy or has no available quota. Try again later.',
     networkUnavailable: 'Could not connect to the translator. Check your network and try again.',
-    missingCredential: 'Add an API Key for each selected translator first.',
     workspaceRequired: 'Qwen 3.5 requires a Workspace ID.',
     chooseAudioSource: 'Turn on at least one audio source.',
     chooseApplication: 'Choose an app to capture audio from.',
