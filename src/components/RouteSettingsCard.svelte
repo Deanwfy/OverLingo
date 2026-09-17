@@ -117,13 +117,14 @@
         </label>
     </header>
 
-    {#if routeId === 'system' && state.capture.capabilities.applicationCapture}
+    {#if routeId === 'system'}
         <label class="compact-select full-width">
             <span>{t('audioFrom')}</span>
             <select
                 class="compact"
                 value={state.audio.system.scope === 'application' ? selectedApplication?.bundleId : 'all'}
-                disabled={!route.enabled || state.capture.loading || starting}
+                disabled={!route.enabled || state.capture.loading || starting
+                    || !state.capture.capabilities.applicationCapture}
                 onchange={(event) => send({ type: 'capture', bundleId: event.currentTarget.value })}
             >
                 <option value="all">{t('allComputerAudio')}</option>
