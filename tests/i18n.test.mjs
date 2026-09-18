@@ -2,11 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { messages, setLocale, t } from '../src/core/i18n.js';
-import {
-    languageName,
-    nativeLanguageName,
-    translationDirection,
-} from '../src/core/languages.js';
+import { languageName, translationDirection } from '../src/core/languages.js';
 
 test('all interface languages provide the complete message catalog', () => {
     const expected = Object.keys(messages.en).sort();
@@ -24,11 +20,10 @@ test('Spanish, Japanese and Korean can be selected directly', () => {
     assert.equal(t('launchAtLogin'), '로그인 시 실행');
 });
 
-test('language names support interface and native labels', () => {
+test('language names follow the interface language', () => {
     assert.equal(languageName('en', 'ja'), '英語');
     assert.equal(languageName('es', 'es'), 'español');
     assert.equal(languageName('ko', 'ko'), '한국어');
-    assert.equal(nativeLanguageName('ja'), '日本語');
 });
 
 test('subtitle directions use the target language', () => {

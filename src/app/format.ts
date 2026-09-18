@@ -17,11 +17,3 @@ export function formatDate(value: string) {
             minute: '2-digit',
         }).format(date);
 }
-
-export function formatTime(value: string | number) {
-    return new Intl.DateTimeFormat(undefined, {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-    }).format(new Date(value));
-}

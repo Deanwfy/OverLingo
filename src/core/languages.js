@@ -50,11 +50,6 @@ export function languageName(code, locale = 'en') {
     return language?.labels[locale] || language?.labels.en || code;
 }
 
-export function nativeLanguageName(code) {
-    const nativeLocale = code === 'zh' ? 'zh-Hans' : code === 'yue' ? 'zh-Hant-HK' : code;
-    return languageName(code, nativeLocale);
-}
-
 export function translationDirection(source, target, fallbackLocale = 'en') {
     const locale = target === 'zh'
         ? 'zh-Hans'

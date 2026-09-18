@@ -92,13 +92,3 @@ export function supportsLanguage(id, code) {
     const supported = translator(id)?.languages;
     return !supported || supported.has(code);
 }
-
-// Nothing is ever hidden or blocked: the user has to be able to change translator and
-// language in either order, and only the resulting combination has to be valid.
-export function routeConfigError(model, sourceLanguage, targetLanguage) {
-    if (sourceLanguage === targetLanguage) return 'invalidLanguagePair';
-    if (!supportsLanguage(model, sourceLanguage) || !supportsLanguage(model, targetLanguage)) {
-        return 'unsupportedLanguage';
-    }
-    return '';
-}
