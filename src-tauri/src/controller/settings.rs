@@ -1,6 +1,6 @@
 use super::model::{OverlaySettingsPatch, QwenSettingsPatch, RouteSettingsPatch};
 use super::{enabled_route_ids, route_config, route_config_mut, Action, ControllerActor};
-use crate::app_config::{is_overlay_layout, ApplicationReference, RouteConfig};
+use crate::app_config::{is_overlay_layout, normalize_overlay, ApplicationReference, RouteConfig};
 use crate::audio::capture;
 use crate::credentials::CredentialState;
 use crate::translators::{engine_of, route_config_error, start_blocker};
@@ -36,10 +36,10 @@ impl ControllerActor {
     pub(super) fn update_overlay_settings(&mut self, patch: OverlaySettingsPatch) {
         let overlay = &mut self.config.overlay;
         if let Some(opacity) = patch.opacity.filter(|value| value.is_finite()) {
-            overlay.opacity = opacity.clamp(0.0, 1.0);
+            overlay.opacity = opacity;
         }
         if let Some(font_scale) = patch.font_scale.filter(|value| value.is_finite()) {
-            overlay.font_scale = font_scale.clamp(0.75, 1.8);
+            overlay.font_scale = font_scale;
         }
         if let Some(always_on_top) = patch.always_on_top {
             overlay.always_on_top = always_on_top;
@@ -53,16 +53,14 @@ impl ControllerActor {
         if let Some(show_translation) = patch.show_translation {
             overlay.show_translation = show_translation;
         }
-        if !overlay.show_original && !overlay.show_translation {
-            overlay.show_translation = true;
-        }
         if let Some(layout) = patch.layout.filter(|value| is_overlay_layout(value)) {
             overlay.layout = layout;
         }
+        normalize_overlay(overlay);
         if patch.always_on_top.is_some() || patch.click_through.is_some() {
             self.apply_overlay_window_flags();
         }
-        self.save_config();
+        self.schedule_save();
         self.publish();
     }
 

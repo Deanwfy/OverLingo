@@ -28,6 +28,12 @@
         update({ [field]: !state.config[field] });
     }
 
+    // Mirrors normalize_overlay() in app_config.rs.
+    const FONT_SCALE_RANGE = { min: 0.5, max: 2 };
+    let fontScaleFill = $derived(
+        (state.config.fontScale - FONT_SCALE_RANGE.min) / (FONT_SCALE_RANGE.max - FONT_SCALE_RANGE.min),
+    );
+
     const layouts: OverlayLayout[] = ['split', 'merged'];
     const layoutLabel: Record<OverlayLayout, 'layoutSplit' | 'layoutMerged'> = {
         split: 'layoutSplit',
@@ -88,12 +94,12 @@
                 <span>{t('subtitleSize')} <output>{Math.round(state.config.fontScale * 100)}%</output></span>
                 <input
                     type="range"
-                    min="75"
-                    max="180"
-                    step="5"
-                    value={state.config.fontScale * 100}
-                    style:--fill={(state.config.fontScale * 100 - 75) / 105}
-                    oninput={(event) => update({ fontScale: Number(event.currentTarget.value) / 100 })}
+                    min={FONT_SCALE_RANGE.min}
+                    max={FONT_SCALE_RANGE.max}
+                    step="0.01"
+                    value={state.config.fontScale}
+                    style:--fill={fontScaleFill}
+                    oninput={(event) => update({ fontScale: Number(event.currentTarget.value) })}
                 />
             </label>
             <label class="overlay-switch-row">

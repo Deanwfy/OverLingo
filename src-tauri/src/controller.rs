@@ -136,6 +136,7 @@ enum Action {
         present: bool,
     },
     Tick(u64),
+    SaveConfig(u64),
 }
 
 /// Owns all mutable session state. Every mutation arrives as an `Action` on one channel,
@@ -158,6 +159,7 @@ struct ControllerActor {
     /// Hands out the tokens that let stale provider, capture and retry callbacks be ignored.
     sequence: u64,
     session_generation: u64,
+    save_generation: u64,
     notice: Option<ControllerNotice>,
 }
 
@@ -186,6 +188,7 @@ impl ControllerActor {
             journal: None,
             sequence: 0,
             session_generation: 0,
+            save_generation: 0,
             notice: None,
         }
     }
@@ -231,6 +234,11 @@ impl ControllerActor {
                     self.credentials_changed(&provider, present)
                 }
                 Action::Tick(generation) => self.tick(generation),
+                Action::SaveConfig(generation) => {
+                    if generation == self.save_generation {
+                        self.save_config();
+                    }
+                }
             }
         }
     }
@@ -356,6 +364,17 @@ impl ControllerActor {
             self.open_route(route_id);
         }
         self.schedule_tick();
+    }
+
+    /// Slider drags patch the config many times a second; the file is written once they settle.
+    fn schedule_save(&mut self) {
+        self.save_generation = self.save_generation.wrapping_add(1);
+        let sender = self.sender.clone();
+        let generation = self.save_generation;
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let _ = sender.send(Action::SaveConfig(generation));
+        });
     }
 
     /// Drives the elapsed-time readout while a session is open.

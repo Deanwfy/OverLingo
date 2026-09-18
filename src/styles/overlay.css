@@ -267,14 +267,14 @@ body {
 
 .overlay-turn p {
     color: rgba(255, 255, 255, .62);
-    font-size: calc(13px * var(--font-scale));
+    font-size: calc(15px * var(--font-scale));
     font-weight: 480;
     line-height: 1.38;
 }
 
 .overlay-turn strong {
     color: rgba(255, 255, 255, .98);
-    font-size: calc(17px * var(--font-scale));
+    font-size: calc(20px * var(--font-scale));
     font-weight: 650;
     line-height: 1.38;
 }
@@ -291,7 +291,9 @@ body {
     margin: auto;
     align-self: center;
     color: rgba(255, 255, 255, .3);
-    font-size: calc(12px * var(--font-scale));
+    /* The size of a translation line, so the slider previews it before any arrives. */
+    font-size: calc(20px * var(--font-scale));
+    line-height: 1.38;
 }
 
 @media (max-width: 700px) {

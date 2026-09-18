@@ -77,6 +77,18 @@ pub struct OverlayConfig {
     pub layout: String,
 }
 
+pub(crate) fn normalize_overlay(overlay: &mut OverlayConfig) {
+    overlay.opacity = overlay.opacity.clamp(0.0, 1.0);
+    // Mirrored by FONT_SCALE_RANGE in OverlaySettingsPanel.svelte.
+    overlay.font_scale = overlay.font_scale.clamp(0.5, 2.0);
+    if !overlay.show_original && !overlay.show_translation {
+        overlay.show_translation = true;
+    }
+    if !is_overlay_layout(&overlay.layout) {
+        overlay.layout = "split".into();
+    }
+}
+
 pub(crate) fn is_overlay_layout(layout: &str) -> bool {
     matches!(layout, "split" | "merged")
 }
@@ -227,14 +239,7 @@ impl AppConfig {
             self.audio.microphone.device = (!device.is_empty()).then(|| device.to_string());
         }
         self.qwen.workspace_id = self.qwen.workspace_id.trim().into();
-        self.overlay.opacity = self.overlay.opacity.clamp(0.0, 1.0);
-        self.overlay.font_scale = self.overlay.font_scale.clamp(0.75, 1.8);
-        if !self.overlay.show_original && !self.overlay.show_translation {
-            self.overlay.show_translation = true;
-        }
-        if !is_overlay_layout(&self.overlay.layout) {
-            self.overlay.layout = "split".into();
-        }
+        normalize_overlay(&mut self.overlay);
         if crate::translators::qwen_region(&self.qwen.region).is_none() {
             self.qwen.region = "beijing".into();
         }
@@ -358,6 +363,7 @@ mod tests {
         let mut config = AppConfig::default();
         config.routes.system.input = "microphone".into();
         config.overlay.opacity = 4.0;
+        config.overlay.font_scale = 9.0;
         config.overlay.show_original = false;
         config.overlay.show_translation = false;
         config.overlay.layout = "stacked".into();
@@ -366,6 +372,7 @@ mod tests {
 
         assert_eq!(config.routes.system.input, "system");
         assert_eq!(config.overlay.opacity, 1.0);
+        assert_eq!(config.overlay.font_scale, 2.0);
         assert!(!config.overlay.show_original);
         assert!(config.overlay.show_translation);
         assert_eq!(config.overlay.layout, "split");
