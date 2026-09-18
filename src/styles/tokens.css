@@ -26,12 +26,13 @@
         --red: light-dark(#d34b4b, #ef7272);
         --red-soft: color-mix(in srgb, var(--red) 11%, transparent);
         --shadow: 0 1px 2px light-dark(rgba(0, 0, 0, .035), rgba(0, 0, 0, .16));
-        /* The accent in context: anything belonging to system audio turns green by
-           setting --route, and controls inside follow it. */
+        /* The accent in context: system audio, the main route, keeps it; anything
+           belonging to the microphone turns green by setting --route, and controls
+           inside follow it. */
         --route: var(--accent);
     }
 
-    [data-route='system'] {
+    [data-route='microphone'] {
         --route: var(--green);
     }
 
