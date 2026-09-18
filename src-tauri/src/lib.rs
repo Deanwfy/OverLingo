@@ -37,8 +37,6 @@ pub(crate) fn exit_now(app: &tauri::AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     install_tls_crypto_provider();
-    #[cfg(not(target_os = "macos"))]
-    let background_launch = std::env::args_os().any(|arg| arg == "--background");
 
     let context = tauri::generate_context!();
     let credential_service = context.config().identifier.clone();
@@ -52,7 +50,6 @@ pub fn run() {
     #[cfg(not(target_os = "macos"))]
     let builder = builder.plugin(
         tauri_plugin_autostart::Builder::new()
-            .arg("--background")
             .app_name(context.config().identifier.clone())
             .build(),
     );
@@ -67,10 +64,6 @@ pub fn run() {
             config.overlay.frame =
                 shell::overlay_frame::restore(app.handle(), config.overlay.frame);
             app.manage(controller::AppController::new(app.handle().clone(), config));
-            #[cfg(not(target_os = "macos"))]
-            if !background_launch {
-                shell::show_settings(app.handle()).map_err(std::io::Error::other)?;
-            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
