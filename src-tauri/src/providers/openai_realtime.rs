@@ -1,4 +1,4 @@
-use super::{Connection, Event, Events, FragmentKind, ProviderState};
+use super::{connect_error, Connection, Event, Events, FragmentKind, ProviderState};
 use crate::audio::resampler::UpsamplerTo24k;
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures_util::{SinkExt, StreamExt};
@@ -110,7 +110,7 @@ pub fn start_session(
         },
         move |_| async move {
             if let Err(error) = run_session(config, audio_rx, stop_rx, events.clone()).await {
-                events.emit(Event::error(error));
+                events.emit(Event::Error(error));
             }
             events.emit(Event::Closed("session_ended".into()));
         },
@@ -143,7 +143,7 @@ async fn run_session(
         result = &mut connect => {
             result
                 .map_err(|_| "websocket handshake timed out".to_string())?
-                .map_err(|e| sanitize_error(&cfg, format!("websocket connect: {e}")))?
+                .map_err(|e| sanitize_error(&cfg, connect_error(&e)))?
         }
         _ = stop_rx.recv() => return Ok(()),
     };
@@ -302,7 +302,7 @@ fn handle_server_event(text: &str, events: &Events, segments: &mut Segments) {
                 .flatten()
                 .collect::<Vec<_>>()
                 .join(": ");
-            events.emit(Event::error(if message.is_empty() {
+            events.emit(Event::Error(if message.is_empty() {
                 "OpenAI returned an unknown error".into()
             } else {
                 message

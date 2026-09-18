@@ -1,4 +1,4 @@
-use super::{Connection, Event, Events, FragmentKind, ProviderState};
+use super::{connect_error, Connection, Event, Events, FragmentKind, ProviderState};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures_util::{SinkExt, StreamExt};
 use http::Request;
@@ -58,7 +58,7 @@ pub fn start_session(
         );
         if let Err(error) = run_session(id, config, audio_rx, stop_rx, events.clone()).await {
             diagnostic_log(id, format!("failed error={error}"));
-            events.emit(Event::error(error));
+            events.emit(Event::Error(error));
         }
         events.emit(Event::Closed("session_ended".into()));
         diagnostic_log(id, "ended");
@@ -96,7 +96,7 @@ async fn run_session(
         result = &mut connect => {
             result
                 .map_err(|_| "websocket handshake timed out".to_string())?
-                .map_err(|e| sanitize_error(&cfg, format!("websocket connect: {e}")))?
+                .map_err(|e| sanitize_error(&cfg, connect_error(&e)))?
         }
         _ = stop_rx.recv() => {
             diagnostic_log(session_id, "websocket_handshake_cancelled");

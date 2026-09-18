@@ -1,4 +1,4 @@
-use super::{Connection, Event, Events, FragmentKind, ProviderState};
+use super::{connect_error, Connection, Event, Events, FragmentKind, ProviderState};
 use futures_util::{SinkExt, StreamExt};
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -42,7 +42,7 @@ pub fn start_session(
 
     let id = state.start(Session { audio_tx, stop_tx }, move |_| async move {
         if let Err(error) = run_session(config, audio_rx, stop_rx, events.clone()).await {
-            events.emit(Event::error(error));
+            events.emit(Event::Error(error));
         }
         events.emit(Event::Closed("session_ended".into()));
     });
@@ -64,7 +64,7 @@ async fn run_session(
         result = &mut connect => {
             result
                 .map_err(|_| "websocket handshake timed out".to_string())?
-                .map_err(|error| sanitize_error(&cfg, format!("websocket connect: {error}")))?
+                .map_err(|error| sanitize_error(&cfg, connect_error(&error)))?
         }
         _ = stop_rx.recv() => return Ok(()),
     };
@@ -182,7 +182,7 @@ fn handle_server_message(text: &str, events: &Events, segments: &mut Segments) -
         return false;
     };
     if let Some(error) = server_error(&value) {
-        events.emit(error);
+        events.emit(Event::Error(error));
         return true;
     }
     let Some(tokens) = value.get("tokens").and_then(|tokens| tokens.as_array()) else {
@@ -244,7 +244,7 @@ fn handle_server_message(text: &str, events: &Events, segments: &mut Segments) -
     false
 }
 
-fn server_error(value: &serde_json::Value) -> Option<Event> {
+fn server_error(value: &serde_json::Value) -> Option<String> {
     let code = value.get("error_code").and_then(serde_json::Value::as_u64);
     let field = |name: &str| {
         value
@@ -258,16 +258,10 @@ fn server_error(value: &serde_json::Value) -> Option<Event> {
         .collect::<Vec<_>>()
         .join(": ");
     let code = code?;
-    let message = if message.is_empty() {
+    Some(if message.is_empty() {
         format!("Soniox returned error {code}")
     } else {
         message
-    };
-    // A rejected key or a spent balance answers the same way however often it is asked.
-    Some(if (401..=403).contains(&code) {
-        Event::fatal(message)
-    } else {
-        Event::error(message)
     })
 }
 
@@ -385,35 +379,14 @@ mod tests {
         assert!(collected.lock().unwrap().is_empty());
     }
 
-    /// A rejected key answers the same way however often it is asked, so it must end the
-    /// session outright instead of spending the retry budget.
     #[test]
-    fn a_rejected_key_ends_the_session_without_a_retry() {
+    fn a_server_error_is_shown_as_sent() {
         let error = server_error(&serde_json::json!({
             "tokens": [],
             "error_code": 401,
             "error_type": "unauthorized",
             "error_message": "bad key",
         }));
-        assert!(matches!(
-            error,
-            Some(Event::Error { ref message, retryable: false }) if message == "unauthorized: bad key"
-        ));
-    }
-
-    #[test]
-    fn a_server_outage_is_worth_retrying() {
-        let error = server_error(&serde_json::json!({
-            "tokens": [],
-            "error_code": 503,
-            "error_type": "service_unavailable",
-        }));
-        assert!(matches!(
-            error,
-            Some(Event::Error {
-                retryable: true,
-                ..
-            })
-        ));
+        assert_eq!(error.as_deref(), Some("unauthorized: bad key"));
     }
 }

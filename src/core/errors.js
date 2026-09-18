@@ -1,5 +1,5 @@
 export function readableRuntimeError(error, text) {
-    const message = error?.message || String(error || text('routeFailed'));
+    const message = error?.message || String(error || text('unknownError'));
     if (/has not played any audio/i.test(message)) {
         return text('captureApplicationSilent');
     }
@@ -13,15 +13,6 @@ export function readableRuntimeError(error, text) {
     // fail for their own reasons and keep their own message rather than misdirecting.
     if (/create audio tap/i.test(message)) {
         return text('audioPermissionRequired');
-    }
-    if (/api.?key|unauthori[sz]ed|authentication|invalid token|401/i.test(message)) {
-        return text('credentialRejected');
-    }
-    if (/workspace|forbidden|permission|access denied|403/i.test(message)) {
-        return text('workspaceRejected');
-    }
-    if (/rate.?limit|quota|too many|concurren|429/i.test(message)) {
-        return text('providerBusy');
     }
     if (/timed out|websocket connect|dns|tls|network|connection refused/i.test(message)) {
         return text('networkUnavailable');

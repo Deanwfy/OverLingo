@@ -17,12 +17,7 @@ pub enum Event {
         text: String,
         final_fragment: bool,
     },
-    /// `retryable` is false for anything a reconnect cannot fix: a rejected key, an
-    /// exhausted balance, a configuration the provider refuses.
-    Error {
-        message: String,
-        retryable: bool,
-    },
+    Error(String),
     Closed(String),
 }
 
@@ -33,21 +28,6 @@ pub enum FragmentKind {
 }
 
 impl Event {
-    /// Classifies from the text, for providers whose wire errors carry no usable code.
-    pub fn error(message: impl Into<String>) -> Self {
-        let message = message.into();
-        let retryable = !is_permanent(&message);
-        Self::Error { message, retryable }
-    }
-
-    /// For a provider that knows from its own error shape that retrying is pointless.
-    pub fn fatal(message: impl Into<String>) -> Self {
-        Self::Error {
-            message: message.into(),
-            retryable: false,
-        }
-    }
-
     pub fn fragment(kind: FragmentKind, text: impl Into<String>, final_fragment: bool) -> Self {
         Self::Fragment {
             kind,
@@ -57,25 +37,45 @@ impl Event {
     }
 }
 
-/// Rate limits, outages and quotas all clear on their own; a rejected credential does not.
-/// The list stays narrow because guessing wrong the other way only costs a few seconds of
-/// retrying, while a false positive strands a route that would have recovered.
-fn is_permanent(message: &str) -> bool {
-    let message = message.to_lowercase();
-    [
-        "401",
-        "402",
-        "403",
-        "unauthorized",
-        "unauthorised",
-        "invalid api key",
-        "invalid_api_key",
-        "authentication",
-        "access denied",
-        "forbidden",
-    ]
-    .iter()
-    .any(|marker| message.contains(marker))
+/// A handshake the server refused carries its reason in the response body, which the
+/// transport's own message drops in favour of the bare status line.
+pub fn connect_error(error: &tokio_tungstenite::tungstenite::Error) -> String {
+    use tokio_tungstenite::tungstenite::Error;
+    let Error::Http(response) = error else {
+        return format!("websocket connect: {error}");
+    };
+    let body = response
+        .body()
+        .as_deref()
+        .map(String::from_utf8_lossy)
+        .map(|body| body.trim().to_string())
+        .filter(|body| !body.is_empty());
+    match body {
+        Some(body) => format!(
+            "{} {}",
+            response.status(),
+            coded_error(&body).unwrap_or(body)
+        ),
+        None => format!("HTTP error: {}", response.status()),
+    }
+}
+
+/// `{"code","message"}` at the top level or under `error`, which is how the providers here
+/// shape a rejection; anything else is shown as sent.
+fn coded_error(body: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(body).ok()?;
+    let error = value.get("error").unwrap_or(&value);
+    let field = |name: &str| {
+        error
+            .get(name)
+            .and_then(|value| value.as_str())
+            .filter(|value| !value.is_empty())
+    };
+    let parts = [field("code"), field("message")]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    (!parts.is_empty()).then(|| parts.join(": "))
 }
 
 /// Carries provider events back to the controller. Cloneable so the session task and the
@@ -155,6 +155,28 @@ impl ProviderState {
             .and_then(|mut open| open.remove(&id));
         if let Some(connection) = closing {
             connection.stop();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_refused_handshake_shows_the_reason_the_server_sent() {
+        for (body, shown) in [
+            (
+                r#"{"code":"InvalidApiKey","message":"Invalid API-key provided.","request_id":"x"}"#,
+                "InvalidApiKey: Invalid API-key provided.",
+            ),
+            (
+                r#"{"error":{"code":"invalid_api_key","message":"Incorrect API key provided"}}"#,
+                "invalid_api_key: Incorrect API key provided",
+            ),
+            ("Unauthorized", "Unauthorized"),
+        ] {
+            assert_eq!(coded_error(body).unwrap_or(body.into()), shown);
         }
     }
 }

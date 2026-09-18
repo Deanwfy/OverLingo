@@ -24,6 +24,8 @@ const demoParams = () => new URLSearchParams(location.search);
 const demoScene = () => (demoParams().get('scene') === 'video' ? 'video' : 'meeting');
 // `?layout=merged` shows both routes on one timeline for this load only.
 const demoLayout = () => (demoParams().get('layout') === 'merged' ? 'merged' : null);
+// `?fail=system` fails that route once the demo is running, with a message long enough to wrap.
+const demoFailure = () => demoParams().get('fail');
 // `?speed=0.25` slows the demo so every frame can be captured; timing is scaled back on encode.
 const demoSpeed = () => Number(demoParams().get('speed')) || 1;
 let autostarted = false;
@@ -162,6 +164,11 @@ function setTranslation(command) {
         state.startedAt = new Date().toISOString();
         timers.push(setTimeout(() => {
             state.translationState = 'running';
+            const failing = state.routes[demoFailure()];
+            if (failing) {
+                failing.state = 'failed';
+                failing.error = 'Arrearage: Access denied, please make sure your account is in good standing.';
+            }
             broadcast();
         }, 180));
         tickElapsed(state);

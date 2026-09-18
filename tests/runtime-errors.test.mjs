@@ -12,13 +12,17 @@ test('a refused audio capture reads as a permission problem, not a raw status co
     assert.equal(result, 'audioPermissionRequired');
 });
 
-test('classifies provider and device failures', () => {
-    assert.equal(readableRuntimeError(new Error('HTTP 401 unauthorized'), text), 'credentialRejected');
-    assert.equal(readableRuntimeError(new Error('Workspace access denied'), text), 'workspaceRejected');
+test('classifies device and network failures', () => {
     assert.equal(readableRuntimeError(new Error('No microphone input device'), text), 'microphoneUnavailable');
     assert.equal(
         readableRuntimeError(new Error('Selected application is not running'), text),
         'captureApplicationUnavailable',
     );
     assert.equal(readableRuntimeError(new Error('websocket connect timed out'), text), 'networkUnavailable');
+});
+
+test('what the translator said is shown as sent', () => {
+    const sent = '401 Unauthorized InvalidApiKey: Invalid API-key provided.';
+    assert.equal(readableRuntimeError(new Error(sent), text), sent);
+    assert.equal(readableRuntimeError(undefined, text), 'unknownError');
 });

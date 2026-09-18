@@ -10,7 +10,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use tauri::Manager;
 
-const MAX_RECONNECT_ATTEMPTS: u8 = 3;
+/// The same short budget for every failure: telling a blip from a rejected key by its
+/// wording is guesswork, and guessing wrong here only costs a few seconds.
+const MAX_RECONNECT_ATTEMPTS: u8 = 2;
 /// A flat wait rather than a growing one: the failures worth retrying are blips, and a
 /// session that has already dropped out should come back at a predictable pace.
 const RECONNECT_DELAY: Duration = Duration::from_secs(2);
@@ -201,7 +203,7 @@ impl ControllerActor {
                 if let Some(route) = self.routes.get_mut(route_id) {
                     route.pending = None;
                 }
-                self.tear_down_route(route_id, error, false);
+                self.tear_down_route(route_id, error);
             }
         }
     }
@@ -229,13 +231,12 @@ impl ControllerActor {
                 final_fragment,
             } if !pending => self.push_fragment(route_id, token, kind, text, final_fragment),
             ProviderEvent::Fragment { .. } => {}
-            ProviderEvent::Error { message, .. } | ProviderEvent::Closed(message) if pending => {
+            ProviderEvent::Error(message) | ProviderEvent::Closed(message) if pending => {
                 self.fail_pending(route_id, token, message)
             }
-            ProviderEvent::Error { message, retryable } => {
-                self.fail_route(route_id, token, message, retryable)
+            ProviderEvent::Error(message) | ProviderEvent::Closed(message) => {
+                self.tear_down_route(route_id, message)
             }
-            ProviderEvent::Closed(reason) => self.fail_route(route_id, token, reason, true),
         }
     }
 
@@ -298,7 +299,7 @@ impl ControllerActor {
         if let Some(session) = pending {
             provider::stop(&self.app, session.handle);
         }
-        self.tear_down_route(route_id, error, true);
+        self.tear_down_route(route_id, error);
     }
 
     fn start_capture(&mut self, route_id: &str) {
@@ -401,35 +402,24 @@ impl ControllerActor {
             }
             Err(error) => {
                 route.capture = None;
-                self.tear_down_route(route_id, error, false);
+                self.tear_down_route(route_id, error);
             }
         }
     }
 
-    /// Retryable: a capture that dies mid-session is usually a device changing mode or
-    /// owner (a Bluetooth headset flipping profiles), which a rebuild fixes. A device
-    /// that is genuinely gone fails the rebuild itself, and that path is what gives up.
+    /// A capture that dies mid-session is usually a device changing mode or owner (a
+    /// Bluetooth headset flipping profiles), which the rebuild fixes.
     pub(super) fn fail_capture(&mut self, route_id: &str, token: u64, error: String) {
         if self.routes.get(route_id).and_then(|route| route.capture) != Some(token) {
             return;
         }
         self.stop_capture(route_id);
-        self.tear_down_route(route_id, error, true);
-    }
-
-    fn fail_route(&mut self, route_id: &str, token: u64, error: String, retryable: bool) {
-        if self
-            .routes
-            .get(route_id)
-            .is_some_and(|route| route.owns(token))
-        {
-            self.tear_down_route(route_id, error, retryable);
-        }
+        self.tear_down_route(route_id, error);
     }
 
     /// Drops every session on the route and either schedules a retry or gives up. The
     /// capture stream stays up so a reconnect costs only the websocket handshake.
-    fn tear_down_route(&mut self, route_id: &str, error: String, retryable: bool) {
+    fn tear_down_route(&mut self, route_id: &str, error: String) {
         if matches!(
             self.translation_state,
             TranslationState::Stopped | TranslationState::Paused
@@ -445,7 +435,7 @@ impl ControllerActor {
         route.reconfiguring = false;
         route.error = error.clone();
         route.bridge.detach();
-        let retrying = retryable && route.reconnect_attempt < MAX_RECONNECT_ATTEMPTS;
+        let retrying = route.reconnect_attempt < MAX_RECONNECT_ATTEMPTS;
         if retrying {
             route.reconnect_attempt += 1;
             route.state = RouteState::Reconnecting;
@@ -481,7 +471,12 @@ impl ControllerActor {
     /// The user asking again after the automatic attempts ran out. Clears the budget so a
     /// blip that outlasted them can still recover without restarting the whole session.
     pub(super) fn retry_route(&mut self, route_id: &str) {
-        if !self.translation_state.is_active() {
+        // Not `is_active`: a session whose routes all failed is the one most worth bringing
+        // back, since starting over would clear the subtitles and split the record.
+        if matches!(
+            self.translation_state,
+            TranslationState::Stopped | TranslationState::Paused
+        ) {
             return;
         }
         let Some(route) = self.routes.get_mut(route_id) else {

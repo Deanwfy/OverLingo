@@ -233,12 +233,6 @@ impl ControllerActor {
         if enabled.is_empty() {
             return Some("chooseAudioSource");
         }
-        if self.config.routes.system.enabled
-            && self.config.audio.system.scope == "application"
-            && self.config.audio.system.application.is_none()
-        {
-            return Some("chooseApplication");
-        }
         let credentials = self.app.state::<CredentialState>().0.lock().ok()?.clone();
         for route_id in enabled {
             let route = self.route_config(route_id)?;
