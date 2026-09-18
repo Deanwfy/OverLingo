@@ -126,6 +126,8 @@ pub fn install(app: &mut App, locale: &str) -> tauri::Result<()> {
         for chrome in overlay_chrome::create(app.handle(), &overlay)? {
             configure_chrome(&chrome)?;
         }
+        #[cfg(target_os = "macos")]
+        super::overlay_frame::watch_screens(app.handle());
         let handle = app.handle().clone();
         // AppKit moves a child window with its parent; repositioning it again on every
         // move only makes it stutter. Windows offers no such coupling.

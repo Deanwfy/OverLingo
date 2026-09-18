@@ -1,3 +1,4 @@
+use crate::geometry::Rect;
 use crate::persistence::write_atomic;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -75,9 +76,14 @@ pub struct OverlayConfig {
     pub show_translation: bool,
     /// "split" or "merged"; see [`is_overlay_layout`].
     pub layout: String,
+    /// Where the subtitle box sits.
+    pub frame: Option<Rect>,
 }
 
 pub(crate) fn normalize_overlay(overlay: &mut OverlayConfig) {
+    overlay.frame = overlay
+        .frame
+        .filter(|frame| frame.is_finite() && frame.width > 0.0 && frame.height > 0.0);
     overlay.opacity = overlay.opacity.clamp(0.0, 1.0);
     // Mirrored by FONT_SCALE_RANGE in OverlaySettingsPanel.svelte.
     overlay.font_scale = overlay.font_scale.clamp(0.5, 2.0);
@@ -163,6 +169,7 @@ impl Default for OverlayConfig {
             show_original: true,
             show_translation: true,
             layout: "split".into(),
+            frame: None,
         }
     }
 }
@@ -364,6 +371,12 @@ mod tests {
         config.routes.system.input = "microphone".into();
         config.overlay.opacity = 4.0;
         config.overlay.font_scale = 9.0;
+        config.overlay.frame = Some(Rect {
+            x: 10.0,
+            y: 10.0,
+            width: f64::NAN,
+            height: 200.0,
+        });
         config.overlay.show_original = false;
         config.overlay.show_translation = false;
         config.overlay.layout = "stacked".into();
@@ -373,6 +386,7 @@ mod tests {
         assert_eq!(config.routes.system.input, "system");
         assert_eq!(config.overlay.opacity, 1.0);
         assert_eq!(config.overlay.font_scale, 2.0);
+        assert_eq!(config.overlay.frame, None);
         assert!(!config.overlay.show_original);
         assert!(config.overlay.show_translation);
         assert_eq!(config.overlay.layout, "split");

@@ -56,6 +56,9 @@ impl ControllerActor {
         if let Some(layout) = patch.layout.filter(|value| is_overlay_layout(value)) {
             overlay.layout = layout;
         }
+        if let Some(frame) = patch.frame {
+            overlay.frame = Some(frame);
+        }
         normalize_overlay(overlay);
         if patch.always_on_top.is_some() || patch.click_through.is_some() {
             self.apply_overlay_window_flags();
@@ -210,6 +213,9 @@ impl ControllerActor {
     pub(super) fn set_overlay_visible(&mut self, visible: bool, persist: bool) {
         self.overlay_visible = visible;
         self.config.overlay.enabled = visible;
+        if visible {
+            crate::shell::overlay_frame::reconcile(&self.app, self.config.overlay.frame);
+        }
         if let Some(overlay) = self.app.get_webview_window("overlay") {
             let _ = if visible {
                 overlay.show()

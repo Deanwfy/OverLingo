@@ -46,6 +46,7 @@ export const DEFAULT_CONFIG: AppConfig = {
         showOriginal: true,
         showTranslation: true,
         layout: 'split',
+        frame: null,
     },
     qwen: {
         region: 'beijing',

@@ -1,5 +1,6 @@
 use crate::app_config::{AppConfig, RouteConfig};
 use crate::audio::CapturableApplication;
+use crate::geometry::Rect;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -20,7 +21,7 @@ mod transcript;
 
 use clock::SessionClock;
 use journal::Journal;
-use model::{ControllerNotice, ControllerSnapshot, TranslationCommand};
+use model::{ControllerNotice, ControllerSnapshot, OverlaySettingsPatch, TranslationCommand};
 use provider::Event as ProviderEvent;
 use route::ActiveRoute;
 use state::TranslationState;
@@ -53,6 +54,19 @@ impl AppController {
             ControllerActor::new(app, config, sender, snapshot, subscribers).run(receiver),
         );
         controller
+    }
+
+    /// The user finished dragging the subtitle box.
+    pub fn overlay_frame_changed(&self, frame: Rect) {
+        let _ = self.sender.send(Action::OverlayFrame(frame));
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn overlay_frame(&self) -> Option<Rect> {
+        self.snapshot
+            .lock()
+            .ok()
+            .and_then(|snapshot| snapshot.config.frame)
     }
 
     pub fn request(&self, request: ControllerRequest) -> Result<(), String> {
@@ -137,6 +151,7 @@ enum Action {
     },
     Tick(u64),
     SaveConfig(u64),
+    OverlayFrame(Rect),
 }
 
 /// Owns all mutable session state. Every mutation arrives as an `Action` on one channel,
@@ -239,6 +254,9 @@ impl ControllerActor {
                         self.save_config();
                     }
                 }
+                Action::OverlayFrame(frame) => {
+                    self.update_overlay_settings(OverlaySettingsPatch::frame(frame))
+                }
             }
         }
     }
@@ -278,6 +296,7 @@ impl ControllerActor {
             ControllerRequest::RequestCaptureOptions => self.load_capture_options(),
             ControllerRequest::Exit => {
                 self.stop_translation();
+                self.save_config();
                 crate::exit_now(&self.app);
             }
         }

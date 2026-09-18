@@ -46,6 +46,7 @@ export interface AppConfig {
         showOriginal: boolean;
         showTranslation: boolean;
         layout: OverlayLayout;
+        frame: { x: number; y: number; width: number; height: number } | null;
     };
     qwen: {
         region: 'beijing' | 'singapore';

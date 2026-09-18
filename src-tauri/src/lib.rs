@@ -5,6 +5,7 @@ mod commands;
 mod controller;
 mod credentials;
 mod diagnostics;
+mod geometry;
 mod persistence;
 mod providers;
 mod shell;
@@ -61,10 +62,11 @@ pub fn run() {
         .manage(ProviderState::default())
         .manage(credential_state)
         .setup(move |app| {
-            let config = AppConfig::load(app.handle());
-            let locale = config.locale.clone();
+            let mut config = AppConfig::load(app.handle());
+            shell::install(app, &config.locale)?;
+            config.overlay.frame =
+                shell::overlay_frame::restore(app.handle(), config.overlay.frame);
             app.manage(controller::AppController::new(app.handle().clone(), config));
-            shell::install(app, &locale)?;
             #[cfg(not(target_os = "macos"))]
             if !background_launch {
                 shell::show_settings(app.handle()).map_err(std::io::Error::other)?;

@@ -2,6 +2,7 @@ use super::state::{RouteState, TranslationState};
 use super::transcript::{TranscriptDraft, TranscriptTurn};
 use crate::app_config::{AudioConfig, OverlayConfig, QwenConfig, RouteConfig};
 use crate::audio::CapturableApplication;
+use crate::geometry::Rect;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -70,6 +71,16 @@ pub struct OverlaySettingsPatch {
     pub(super) show_original: Option<bool>,
     pub(super) show_translation: Option<bool>,
     pub(super) layout: Option<String>,
+    pub(super) frame: Option<Rect>,
+}
+
+impl OverlaySettingsPatch {
+    pub(super) fn frame(frame: Rect) -> Self {
+        Self {
+            frame: Some(frame),
+            ..Self::default()
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

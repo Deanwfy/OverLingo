@@ -1,4 +1,5 @@
-use super::overlay_chrome::{self, bounds, ChromeFrames, Rect, OVERLAY_LABEL};
+use super::overlay_chrome::{self, bounds, ChromeFrames, OVERLAY_LABEL};
+use crate::geometry::Rect;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};

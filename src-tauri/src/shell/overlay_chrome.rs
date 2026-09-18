@@ -1,3 +1,4 @@
+use crate::geometry::Rect;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -15,31 +16,8 @@ const SETTINGS_OPEN_EVENT: &str = "overlay://settings-open";
 pub const OUTSIDE_CLICK_EVENT: &str = "overlay://outside-click";
 /// Mirrors the overlay window's minimum size in tauri.conf.json, in CSS pixels; resizing
 /// is done here, not by the window system, so the bounds have to be enforced here too.
-const MIN_WIDTH: f64 = 520.0;
-const MIN_HEIGHT: f64 = 140.0;
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Rect {
-    pub x: f64,
-    pub y: f64,
-    pub width: f64,
-    pub height: f64,
-}
-
-impl Rect {
-    pub fn contains(&self, x: f64, y: f64) -> bool {
-        x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
-    }
-
-    pub fn inset(&self, amount: f64) -> Rect {
-        Rect {
-            x: self.x + amount,
-            y: self.y + amount,
-            width: (self.width - 2.0 * amount).max(0.0),
-            height: (self.height - 2.0 * amount).max(0.0),
-        }
-    }
-}
+pub(super) const MIN_WIDTH: f64 = 520.0;
+pub(super) const MIN_HEIGHT: f64 = 140.0;
 
 /// Where the control windows are, when they are on screen.
 #[derive(Clone, Copy, Debug, Default)]
@@ -244,6 +222,9 @@ pub fn drag_overlay(app: AppHandle, edge: Option<String>, begin: bool) {
     }
     if !begin {
         place(&app);
+        if let Some(frame) = bounds(&overlay) {
+            super::overlay_frame::report(&app, frame);
+        }
     }
 }
 
@@ -391,20 +372,12 @@ fn place_all(app: &AppHandle, move_panel: bool) {
         .lock()
         .map(|anchor| *anchor)
         .unwrap_or_default();
-    let work_area = overlay.current_monitor().ok().flatten().map(|monitor| {
-        let scale = if cfg!(target_os = "macos") {
-            monitor.scale_factor()
-        } else {
-            1.0
-        };
-        let area = monitor.work_area();
-        Rect {
-            x: f64::from(area.position.x) / scale,
-            y: f64::from(area.position.y) / scale,
-            width: f64::from(area.size.width) / scale,
-            height: f64::from(area.size.height) / scale,
-        }
-    });
+    let work_area = overlay
+        .current_monitor()
+        .ok()
+        .flatten()
+        .as_ref()
+        .map(work_area);
     // The webviews report CSS pixels; each window is scaled by its own monitor.
     let scaled = |window: &Option<WebviewWindow>, (width, height): (f64, f64)| {
         let scale = window.as_ref().map_or(1.0, screen_scale);
@@ -434,6 +407,22 @@ fn place_all(app: &AppHandle, move_panel: bool) {
         }
     }
     super::overlay_pointer::set_chrome_frames(subtitle_box, frames);
+}
+
+pub(super) fn work_area(monitor: &tauri::Monitor) -> Rect {
+    // Monitors report physical pixels; screen coordinates are points on macOS.
+    let scale = if cfg!(target_os = "macos") {
+        monitor.scale_factor()
+    } else {
+        1.0
+    };
+    let area = monitor.work_area();
+    Rect {
+        x: f64::from(area.position.x) / scale,
+        y: f64::from(area.position.y) / scale,
+        width: f64::from(area.size.width) / scale,
+        height: f64::from(area.size.height) / scale,
+    }
 }
 
 /// Growing upwards means the top edge moves as the height changes; done as two calls the
