@@ -121,6 +121,10 @@ body {
     color: rgba(255, 145, 145, .75) !important;
 }
 
+.overlay-settings-host {
+    position: relative;
+}
+
 .overlay-settings-panel {
     width: 520px;
     max-height: 280px;
@@ -129,6 +133,31 @@ body {
     border: 1px solid rgba(255, 255, 255, .15);
     border-radius: 14px;
     background: rgba(27, 28, 34, .97);
+    scrollbar-width: none; /* WebKit 18.2+ ignores the pseudo-element below */
+}
+
+.overlay-settings-panel::-webkit-scrollbar {
+    display: none;
+}
+
+/* Placed by the scrollThumb action as fractions of the scroll range. */
+.scroll-thumb {
+    --inset: 9px;
+    position: absolute;
+    top: calc(var(--inset) + var(--scroll-top, 0) * (100% - 2 * var(--inset)));
+    right: 4px;
+    width: 3px;
+    height: calc(var(--scroll-size, 1) * (100% - 2 * var(--inset)));
+    border-radius: 2px;
+    background: rgba(255, 255, 255, .28);
+    opacity: 0;
+    transition: opacity 240ms ease;
+    pointer-events: none;
+}
+
+.scroll-thumb.visible {
+    opacity: 1;
+    transition-duration: 80ms;
 }
 
 .source-settings-grid {
