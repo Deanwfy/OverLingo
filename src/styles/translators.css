@@ -1,13 +1,11 @@
 @layer views {
 .translator-workspace {
-    min-height: 455px;
     display: grid;
     grid-template-columns: 238px minmax(0, 1fr);
     overflow: hidden;
 }
 
 .translator-sidebar {
-    min-width: 0;
     padding: 10px;
     border-right: 1px solid var(--border);
     background: var(--surface-muted);
@@ -106,7 +104,6 @@
 }
 
 .translator-detail {
-    min-width: 0;
     padding: 24px 27px 28px;
 }
 

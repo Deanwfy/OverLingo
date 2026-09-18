@@ -50,7 +50,7 @@
 
 <svelte:document onclick={() => { exportOpen = false; }} />
 
-<div class="history-view">
+<div class="preference-view history-view">
     <header class="page-heading">
         <h1>{app.text('history')}</h1>
     </header>

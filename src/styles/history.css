@@ -4,17 +4,9 @@
 }
 
 .history-layout {
-    height: calc(100vh - 132px);
-    min-height: 430px;
     display: grid;
     grid-template-columns: 285px minmax(0, 1fr);
     gap: 13px;
-}
-
-.history-sidebar,
-.history-detail {
-    min-height: 0;
-    overflow: auto;
 }
 
 .history-sidebar {

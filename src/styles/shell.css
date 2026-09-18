@@ -52,11 +52,26 @@ body {
     scrollbar-gutter: stable;
 }
 
-.preference-view,
-.history-view {
+.preference-view {
     width: min(1120px, calc(100% - 42px));
     margin: 0 auto;
     padding: 25px 0 34px;
+}
+
+/* A heading over one card that takes the rest of the window. The height is definite, or
+   the card's row would size to its content and the columns inside would never scroll. */
+.translator-view,
+.history-view {
+    height: 100%;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+}
+
+.translator-sidebar,
+.translator-detail,
+.history-sidebar,
+.history-detail {
+    overflow: auto;
 }
 
 .page-heading {
