@@ -209,6 +209,10 @@ impl ControllerActor {
     }
 
     async fn run(mut self, mut receiver: mpsc::UnboundedReceiver<Action>) {
+        // The box comes back if it was showing at the last quit.
+        if self.config.overlay.enabled {
+            self.set_overlay_visible(true, false);
+        }
         self.publish();
         while let Some(action) = receiver.recv().await {
             match action {

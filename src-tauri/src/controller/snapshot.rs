@@ -108,7 +108,7 @@ pub(super) fn initial_snapshot(app: &AppHandle, config: &AppConfig) -> Controlle
         preferred_locale: config.locale.clone(),
         translation_state: super::state::TranslationState::Stopped,
         elapsed_seconds: 0,
-        overlay_visible: false,
+        overlay_visible: config.overlay.enabled,
         config: config.overlay.clone(),
         audio: config.audio.clone(),
         qwen: config.qwen.clone(),
