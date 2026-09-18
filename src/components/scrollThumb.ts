@@ -1,9 +1,8 @@
 import type { Action } from 'svelte/action';
 
 // A thin thumb beside a scroller whose native scrollbar is hidden (WKWebView cannot make
-// its own thin). Goes on a wrapper around the scroller, so the thumb sits outside the
-// scrolled content; CSS places it from the two fractions set here. Direct DOM writes on
-// purpose: this runs on every scroll frame and must not go through the reactive graph.
+// its own thin). Goes on a wrapper around the scroller; CSS places the thumb from the
+// two fractions set here.
 export const scrollThumb: Action<HTMLElement> = host => {
     const scroller = host.firstElementChild as HTMLElement;
     const thumb = host.appendChild(document.createElement('i'));

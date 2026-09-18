@@ -140,7 +140,7 @@ body {
     display: none;
 }
 
-/* Placed by the scrollThumb action as fractions of the scroll range. */
+/* --scroll-top and --scroll-size come from the scrollThumb action. */
 .scroll-thumb {
     --inset: 9px;
     position: absolute;
