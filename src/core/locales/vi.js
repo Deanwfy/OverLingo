@@ -72,7 +72,7 @@ export default {
     microphoneFrom: 'Đầu vào micrô',
     defaultMicrophone: 'Mặc định hệ thống',
     unavailable: 'Hiện không khả dụng',
-    opacity: 'Độ trong suốt nền',
+    opacity: 'Độ mờ nền',
     subtitleSize: 'Cỡ phụ đề',
     clickThrough: 'Xuyên chuột',
     moreSettings: 'Cài đặt khác…',

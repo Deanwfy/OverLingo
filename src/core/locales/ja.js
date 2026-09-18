@@ -72,7 +72,7 @@ export default {
     microphoneFrom: 'マイク入力',
     defaultMicrophone: 'システムのデフォルト',
     unavailable: '現在利用できません',
-    opacity: '背景の透明度',
+    opacity: '背景の不透明度',
     subtitleSize: '字幕サイズ',
     clickThrough: 'クリックスルー',
     moreSettings: 'その他の設定…',

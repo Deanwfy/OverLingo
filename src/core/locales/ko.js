@@ -72,7 +72,7 @@ export default {
     microphoneFrom: '마이크 입력',
     defaultMicrophone: '시스템 기본값',
     unavailable: '현재 사용할 수 없음',
-    opacity: '배경 투명도',
+    opacity: '배경 불투명도',
     subtitleSize: '자막 크기',
     clickThrough: '클릭 통과',
     moreSettings: '추가 설정…',

@@ -72,7 +72,7 @@ export default {
     microphoneFrom: '麦克风输入',
     defaultMicrophone: '系统默认',
     unavailable: '当前不可用',
-    opacity: '背景透明度',
+    opacity: '背景不透明度',
     subtitleSize: '字幕大小',
     clickThrough: '鼠标穿透',
     moreSettings: '更多设置…',
