@@ -42,6 +42,7 @@ pub fn run() {
     let credential_service = context.config().identifier.clone();
     let credential_state = CredentialState(Mutex::new(CredentialStore::load(credential_service)));
 
+    let (controller, actions) = controller::AppController::new();
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init());
@@ -58,12 +59,14 @@ pub fn run() {
         .manage(AudioState::new())
         .manage(ProviderState::default())
         .manage(credential_state)
+        .manage(controller)
         .setup(move |app| {
             let mut config = AppConfig::load(app.handle());
             shell::install(app, &config.locale)?;
             config.overlay.frame =
                 shell::overlay_frame::restore(app.handle(), config.overlay.frame);
-            app.manage(controller::AppController::new(app.handle().clone(), config));
+            app.state::<controller::AppController>()
+                .start(app.handle().clone(), config, actions);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -98,11 +101,9 @@ pub fn run() {
                     if !EXIT_ALLOWED.load(Ordering::SeqCst) =>
                 {
                     api.prevent_exit();
-                    if let Some(controller) = app_handle.try_state::<controller::AppController>() {
-                        let _ = controller.request(controller::ControllerRequest::Exit);
-                    } else {
-                        exit_now(app_handle);
-                    }
+                    let _ = app_handle
+                        .state::<controller::AppController>()
+                        .request(controller::ControllerRequest::Exit);
                 }
                 _ => {}
             }

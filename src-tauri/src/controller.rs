@@ -33,27 +33,42 @@ const SYSTEM_ROUTE: &str = "system";
 const MICROPHONE_ROUTE: &str = "microphone";
 const ROUTE_IDS: [&str; 2] = [SYSTEM_ROUTE, MICROPHONE_ROUTE];
 
+/// Managed before the windows exist, since their pages subscribe as soon as they load,
+/// which can be while setup is still busy; the actor is started once setup has what it
+/// needs, and anything sent before then waits in the channel.
 #[derive(Clone)]
 pub struct AppController {
     sender: mpsc::UnboundedSender<Action>,
-    snapshot: Arc<Mutex<ControllerSnapshot>>,
+    /// `None` until the actor's first publish, which reaches every surface subscribed so far.
+    snapshot: Arc<Mutex<Option<ControllerSnapshot>>>,
     subscribers: Arc<Mutex<HashMap<String, Channel<ControllerSnapshot>>>>,
 }
 
 impl AppController {
-    pub fn new(app: AppHandle, config: AppConfig) -> Self {
-        let snapshot = Arc::new(Mutex::new(snapshot::initial_snapshot(&app, &config)));
-        let subscribers = Arc::new(Mutex::new(HashMap::new()));
+    pub fn new() -> (Self, mpsc::UnboundedReceiver<Action>) {
         let (sender, receiver) = mpsc::unbounded_channel();
         let controller = Self {
-            sender: sender.clone(),
-            snapshot: snapshot.clone(),
-            subscribers: subscribers.clone(),
+            sender,
+            snapshot: Arc::new(Mutex::new(None)),
+            subscribers: Arc::new(Mutex::new(HashMap::new())),
         };
-        tauri::async_runtime::spawn(
-            ControllerActor::new(app, config, sender, snapshot, subscribers).run(receiver),
+        (controller, receiver)
+    }
+
+    pub fn start(
+        &self,
+        app: AppHandle,
+        config: AppConfig,
+        receiver: mpsc::UnboundedReceiver<Action>,
+    ) {
+        let actor = ControllerActor::new(
+            app,
+            config,
+            self.sender.clone(),
+            self.snapshot.clone(),
+            self.subscribers.clone(),
         );
-        controller
+        tauri::async_runtime::spawn(actor.run(receiver));
     }
 
     /// The user finished dragging the subtitle box.
@@ -66,7 +81,7 @@ impl AppController {
         self.snapshot
             .lock()
             .ok()
-            .and_then(|snapshot| snapshot.config.frame)
+            .and_then(|snapshot| snapshot.as_ref()?.config.frame)
     }
 
     pub fn request(&self, request: ControllerRequest) -> Result<(), String> {
@@ -88,12 +103,18 @@ impl AppController {
         surface: String,
         on_event: Channel<ControllerSnapshot>,
     ) -> Result<(), String> {
-        let snapshot = self.snapshot.lock().map_err(|error| error.to_string())?;
-        let mut subscribers = self.subscribers.lock().map_err(|error| error.to_string())?;
-        on_event
-            .send(snapshot.clone())
-            .map_err(|error| error.to_string())?;
-        subscribers.insert(surface, on_event);
+        let snapshot = self
+            .snapshot
+            .lock()
+            .map_err(|error| error.to_string())?
+            .clone();
+        if let Some(snapshot) = snapshot {
+            on_event.send(snapshot).map_err(|error| error.to_string())?;
+        }
+        self.subscribers
+            .lock()
+            .map_err(|error| error.to_string())?
+            .insert(surface, on_event);
         Ok(())
     }
 }
@@ -118,7 +139,7 @@ pub fn subscribe_controller(
     controller.subscribe(surface, on_event)
 }
 
-enum Action {
+pub(crate) enum Action {
     Request(ControllerRequest),
     Provider {
         route_id: String,
@@ -159,7 +180,7 @@ enum Action {
 struct ControllerActor {
     app: AppHandle,
     sender: mpsc::UnboundedSender<Action>,
-    snapshot: Arc<Mutex<ControllerSnapshot>>,
+    snapshot: Arc<Mutex<Option<ControllerSnapshot>>>,
     subscribers: Arc<Mutex<HashMap<String, Channel<ControllerSnapshot>>>>,
     config: AppConfig,
     translation_state: TranslationState,
@@ -183,7 +204,7 @@ impl ControllerActor {
         app: AppHandle,
         config: AppConfig,
         sender: mpsc::UnboundedSender<Action>,
-        snapshot: Arc<Mutex<ControllerSnapshot>>,
+        snapshot: Arc<Mutex<Option<ControllerSnapshot>>>,
         subscribers: Arc<Mutex<HashMap<String, Channel<ControllerSnapshot>>>>,
     ) -> Self {
         Self {

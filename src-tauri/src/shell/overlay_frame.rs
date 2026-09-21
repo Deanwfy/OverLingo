@@ -18,9 +18,7 @@ const WIDTH_SHARE: f64 = 0.5;
 const BOTTOM_SHARE: f64 = 0.08;
 
 pub fn report(app: &AppHandle, frame: Rect) {
-    if let Some(controller) = app.try_state::<AppController>() {
-        controller.overlay_frame_changed(frame);
-    }
+    app.state::<AppController>().overlay_frame_changed(frame);
 }
 
 /// Places the box at launch and returns where; `None` when no screen is known, which
@@ -75,9 +73,7 @@ pub fn watch_screens(app: &AppHandle) {
             if generation.load(Ordering::SeqCst) != this {
                 return;
             }
-            let home = app
-                .try_state::<AppController>()
-                .and_then(|controller| controller.overlay_frame());
+            let home = app.state::<AppController>().overlay_frame();
             reconcile(&app, home);
         });
     });

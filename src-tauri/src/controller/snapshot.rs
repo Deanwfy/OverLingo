@@ -1,7 +1,6 @@
 use super::model::{CaptureCapabilities, CaptureSnapshot, ControllerSnapshot, RouteSnapshot};
 use super::state::RouteState;
 use super::{ControllerActor, ROUTE_IDS};
-use crate::app_config::AppConfig;
 use crate::credentials::CredentialState;
 use std::collections::HashMap;
 use tauri::{AppHandle, Manager};
@@ -12,7 +11,7 @@ impl ControllerActor {
     pub(super) fn publish(&mut self) {
         let snapshot = self.build_snapshot();
         if let Ok(mut current) = self.snapshot.lock() {
-            *current = snapshot.clone();
+            *current = Some(snapshot.clone());
         }
         if let Ok(mut subscribers) = self.subscribers.lock() {
             subscribers.retain(|_, channel| channel.send(snapshot.clone()).is_ok());
@@ -80,48 +79,4 @@ pub(super) fn credential_snapshot(app: &AppHandle) -> HashMap<String, bool> {
     app.try_state::<CredentialState>()
         .and_then(|state| state.0.lock().ok().map(|store| store.status()))
         .unwrap_or_default()
-}
-
-pub(super) fn initial_snapshot(app: &AppHandle, config: &AppConfig) -> ControllerSnapshot {
-    let routes = ROUTE_IDS
-        .into_iter()
-        .map(|route_id| {
-            let route = if route_id == super::MICROPHONE_ROUTE {
-                &config.routes.microphone
-            } else {
-                &config.routes.system
-            };
-            (
-                route_id.into(),
-                RouteSnapshot {
-                    config: route.clone(),
-                    state: RouteState::Stopped,
-                    error: String::new(),
-                    turns: Vec::new(),
-                    draft: Default::default(),
-                },
-            )
-        })
-        .collect();
-    ControllerSnapshot {
-        locale: crate::app_config::resolve_locale(&config.locale),
-        preferred_locale: config.locale.clone(),
-        translation_state: super::state::TranslationState::Stopped,
-        elapsed_seconds: 0,
-        overlay_visible: config.overlay.enabled,
-        config: config.overlay.clone(),
-        audio: config.audio.clone(),
-        qwen: config.qwen.clone(),
-        capture: CaptureSnapshot {
-            capabilities: CaptureCapabilities {
-                application_capture: cfg!(target_os = "macos"),
-            },
-            applications: Vec::new(),
-            microphones: Vec::new(),
-            loading: false,
-        },
-        credentials: credential_snapshot(app),
-        routes,
-        notice: None,
-    }
 }
