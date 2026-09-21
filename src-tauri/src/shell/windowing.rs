@@ -258,7 +258,36 @@ fn configure_overlay(window: &WebviewWindow) -> tauri::Result<()> {
     );
     panel.set_hides_on_deactivate(false);
     panel.set_works_when_modal(true);
+    round_corners(window);
     Ok(())
+}
+
+/// The window resizes a frame ahead of the webview, and while it shrinks the stale
+/// picture is cut by the window's edge, so that edge is rounded too. A little under the
+/// CSS radius (overlay.css), so the clip never eats into the antialiased edge the webview
+/// draws. Windows keeps its square edge: `SetWindowRgn` set ahead of every resize still
+/// showed the frame.
+#[cfg(target_os = "macos")]
+fn round_corners(window: &WebviewWindow) {
+    use objc2_app_kit::NSWindow;
+
+    const RADIUS: f64 = 16.0;
+    let Ok(raw_window) = window.ns_window() else {
+        return;
+    };
+    let raw_window = raw_window as usize;
+    let _ = window.run_on_main_thread(move || unsafe {
+        let native_window = &*(raw_window as *mut NSWindow);
+        let Some(view) = native_window.contentView() else {
+            return;
+        };
+        view.setWantsLayer(true);
+        let Some(layer) = view.layer() else {
+            return;
+        };
+        layer.setCornerRadius(RADIUS);
+        layer.setMasksToBounds(true);
+    });
 }
 
 /// The same non-activating panel as the subtitles, so clicking a control never brings

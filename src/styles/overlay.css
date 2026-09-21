@@ -23,6 +23,7 @@ body {
     height: 100%;
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, .16);
+    /* On macOS the window itself is clipped 2px inside this (windowing.rs, round_corners). */
     border-radius: 18px;
     background: rgba(17, 18, 22, var(--overlay-opacity));
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07);
