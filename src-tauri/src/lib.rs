@@ -10,6 +10,7 @@ mod persistence;
 mod providers;
 mod shell;
 mod translators;
+mod updates;
 
 use app_config::AppConfig;
 use audio::capture::AudioState;
@@ -45,7 +46,8 @@ pub fn run() {
     let (controller, actions) = controller::AppController::new();
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init());
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build());
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
     #[cfg(not(target_os = "macos"))]
@@ -67,6 +69,7 @@ pub fn run() {
                 shell::overlay_frame::restore(app.handle(), config.overlay.frame);
             app.state::<controller::AppController>()
                 .start(app.handle().clone(), config, actions);
+            updates::install(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -87,6 +90,11 @@ pub fn run() {
             shell::overlay_chrome::drag_overlay,
             controller::controller_action,
             controller::subscribe_controller,
+            updates::update_status,
+            updates::check_for_updates,
+            updates::set_auto_check_updates,
+            updates::download_update,
+            updates::install_update,
         ])
         .build(context)
         .expect("error while building tauri application")

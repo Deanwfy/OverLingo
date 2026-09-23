@@ -12,7 +12,7 @@ export function currentLocale() {
     return locale();
 }
 
-export function t(key: string) {
+export function t(key: string, values?: Record<string, string | number>) {
     void revision;
-    return translate(key);
+    return translate(key, values);
 }

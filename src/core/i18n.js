@@ -18,8 +18,10 @@ export function locale() {
     return currentLocale;
 }
 
-export function t(key) {
-    return messages[currentLocale]?.[key] || messages.en[key] || key;
+export function t(key, values) {
+    const message = messages[currentLocale]?.[key] || messages.en[key] || key;
+    if (!values) return message;
+    return message.replace(/\{\{(\w+)\}\}/g, (placeholder, name) => values[name] ?? placeholder);
 }
 
 function detectLocale() {

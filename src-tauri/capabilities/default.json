@@ -16,7 +16,8 @@
         { "url": "https://help.aliyun.com/*" },
         { "url": "https://www.alibabacloud.com/*" },
         { "url": "https://developers.openai.com/*" },
-        { "url": "https://soniox.com/*" }
+        { "url": "https://soniox.com/*" },
+        { "url": "https://github.com/Deanwfy/OverLingo/*" }
       ]
     }
   ]

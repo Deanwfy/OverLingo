@@ -7,4 +7,6 @@ mod tray_icon;
 mod tray_labels;
 pub mod windowing;
 
-pub use windowing::{install, show_settings, update_tray_for_app, TrayPresentation};
+pub use windowing::{
+    install, set_update_badge, show_settings, update_tray_for_app, TrayPresentation,
+};

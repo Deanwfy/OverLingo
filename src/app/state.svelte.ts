@@ -1,13 +1,22 @@
-import { DEFAULT_CONFIG } from './defaults';
+import { DEFAULT_CONFIG, DEFAULT_UPDATE_STATUS } from './defaults';
 import { HistoryState } from './history.svelte';
 import { readableRuntimeError } from '../core/errors.js';
 import { currentLocale, setLocale, t } from '../core/locale.svelte';
 import { languageName } from '../core/languages.js';
 import {
+    checkForUpdates,
+    downloadUpdate,
     getAutostartStatus,
+    getUpdateStatus,
+    installUpdate,
     invoke,
+    onUpdateFocus,
+    onUpdateStatus,
     openAutostartSettings,
+    openExternal,
+    REPOSITORY_URL,
     sendControllerAction,
+    setAutoCheckUpdates,
     setAutostartEnabled,
     subscribeController,
 } from '../core/runtime.js';
@@ -23,6 +32,7 @@ import type {
     TranscriptDraft,
     TranscriptTurn,
     TranslationState,
+    UpdateStatus,
 } from './types';
 
 const emptyDrafts = (): Record<RouteId, TranscriptDraft> => ({
@@ -50,6 +60,8 @@ export class AppState {
     elapsedSeconds = $state(0);
     toastMessage = $state('');
     toastIsError = $state(false);
+    // Only ever replaced whole, so no need for a deep proxy.
+    update = $state.raw<UpdateStatus>(DEFAULT_UPDATE_STATUS);
     history = new HistoryState({
         notify: (message, error) => this.notify(message, error),
         readableError: error => this.readableError(error),
@@ -59,6 +71,7 @@ export class AppState {
     private toastTimer: ReturnType<typeof setTimeout> | null = null;
     private qwenTimer: ReturnType<typeof setTimeout> | null = null;
     private unsubscribeController: (() => void) | null = null;
+    private unsubscribeUpdates: Array<() => void> = [];
     private lastNoticeId = 0;
 
     get autostartEnabled() {
@@ -67,6 +80,15 @@ export class AppState {
 
     get autostartNeedsApproval() {
         return this.autostartStatus === 'requiresApproval';
+    }
+
+    get updateBusy() {
+        return ['checking', 'downloading'].includes(this.update.stage);
+    }
+
+    // An update in hand, whatever step it is at.
+    get updatePending() {
+        return ['available', 'downloading', 'ready'].includes(this.update.stage);
     }
 
     get translationActive() {
@@ -90,6 +112,7 @@ export class AppState {
             this.credentials = credentials;
             this.autostartStatus = autostart;
             this.unsubscribeController = unsubscribe;
+            void this.watchUpdates();
         } catch (error) {
             this.notify(this.readableError(error), true);
         } finally {
@@ -99,12 +122,13 @@ export class AppState {
 
     destroy() {
         this.unsubscribeController?.();
+        for (const unsubscribe of this.unsubscribeUpdates) unsubscribe();
         if (this.toastTimer) clearTimeout(this.toastTimer);
         if (this.qwenTimer) clearTimeout(this.qwenTimer);
     }
 
-    text(key: string) {
-        return t(key);
+    text(key: string, values?: Record<string, string | number>) {
+        return t(key, values);
     }
 
     language(code: string) {
@@ -156,6 +180,70 @@ export class AppState {
             this.notify(this.readableError(error), true);
         } finally {
             this.autostartLoading = false;
+        }
+    }
+
+    // The backend owns the whole update state; this only mirrors what it announces. A
+    // failure here leaves the footer on its version line rather than blocking startup.
+    private async watchUpdates() {
+        try {
+            this.unsubscribeUpdates = await Promise.all([
+                onUpdateStatus((status: UpdateStatus) => {
+                    this.update = status;
+                }),
+                onUpdateFocus(() => {
+                    void this.setView('general');
+                }),
+            ]);
+            this.update = await getUpdateStatus();
+        } catch {
+            // Updates simply stay unknown.
+        }
+    }
+
+    async checkForUpdates() {
+        try {
+            await checkForUpdates();
+        } catch (error) {
+            this.notify(this.readableError(error), true);
+        }
+    }
+
+    async updateAutoCheck(enabled: boolean) {
+        const previous = this.update.autoCheck;
+        this.update = { ...this.update, autoCheck: enabled };
+        try {
+            await setAutoCheckUpdates(enabled);
+        } catch (error) {
+            this.update = { ...this.update, autoCheck: previous };
+            this.notify(this.readableError(error), true);
+        }
+    }
+
+    async downloadUpdate() {
+        try {
+            await downloadUpdate();
+        } catch (error) {
+            this.notify(this.readableError(error), true);
+        }
+    }
+
+    // Replaces the app and relaunches it, so nothing after this runs on success.
+    async installUpdate() {
+        try {
+            await installUpdate();
+        } catch (error) {
+            this.notify(this.readableError(error), true);
+        }
+    }
+
+    // The opener allowlist is `<repository>/*`, and a glob's `/` is literal: the bare
+    // repository address is only reachable with the slash.
+    async openUpdatePage(path = '/') {
+        try {
+            await openExternal(`${REPOSITORY_URL}${path}`);
+        } catch (error) {
+            this.notify(this.readableError(error), true);
         }
     }
 

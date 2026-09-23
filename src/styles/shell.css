@@ -188,4 +188,89 @@ body {
     border-color: color-mix(in srgb, var(--red) 35%, transparent);
     color: var(--red);
 }
+
+/* The colophon under the General card, on the bare page. Top-aligned so the version line
+   stays put when a status line appears under it; only the mark on the right re-centres. */
+.about-footer {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 4px 0;
+    color: var(--tertiary-text);
+}
+
+.about-text {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.about-version {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.about-footer small {
+    font-size: 10px;
+    line-height: 1.35;
+}
+
+.about-detail {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.about-detail .doc-link {
+    gap: 3px;
+}
+
+.about-alert {
+    color: var(--secondary-text);
+}
+
+.glyph-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.glyph-button:hover:not(:disabled) {
+    color: var(--text);
+}
+
+/* Nudged onto the x-height; on the button, since the spin owns the glyph's transform. */
+.about-version .glyph-button {
+    transform: translateY(0.75px);
+}
+
+.about-repository {
+    flex: none;
+    align-self: center;
+}
+
+.glyph {
+    display: inline-flex;
+}
+
+.spinning {
+    animation: spin 900ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spinning {
+        animation: none;
+    }
+}
 }

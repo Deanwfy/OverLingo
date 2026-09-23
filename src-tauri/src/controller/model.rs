@@ -50,6 +50,8 @@ pub enum ControllerRequest {
     },
     RequestCaptureOptions,
     Exit,
+    /// Quit the way `Exit` does, then come back: the installed update takes effect.
+    Restart,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]

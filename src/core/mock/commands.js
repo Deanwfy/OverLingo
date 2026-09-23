@@ -1,3 +1,4 @@
+import { DEFAULT_UPDATE_STATUS } from '../../app/defaults';
 import { formatDuration } from '../../app/format';
 import { readJson, writeJson } from './storage.js';
 
@@ -54,6 +55,11 @@ export async function getAutostartStatus() {
 export async function setAutostartEnabled(enabled) {
     localStorage.setItem('overlingo-autostart', String(enabled));
     return getAutostartStatus();
+}
+
+// The browser preview has nothing to update.
+export async function getUpdateStatus() {
+    return { ...DEFAULT_UPDATE_STATUS, currentVersion: '0.0.0-preview' };
 }
 
 // Writes what the Rust side would after a stop: the session JSON and its Markdown twin.

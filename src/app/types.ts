@@ -161,3 +161,23 @@ export interface SessionDetail {
         chunks: Array<{ segments: SessionSegment[] }>;
     };
 }
+
+export type UpdateStage =
+    | 'idle'
+    | 'checking'
+    | 'upToDate'
+    | 'available'
+    | 'downloading'
+    | 'ready'
+    | 'failed';
+
+export interface UpdateStatus {
+    stage: UpdateStage;
+    currentVersion: string;
+    version: string | null;
+    progress: number | null;
+    error: string | null;
+    autoCheck: boolean;
+    /** False when this copy was installed by a package the updater cannot replace. */
+    installable: boolean;
+}

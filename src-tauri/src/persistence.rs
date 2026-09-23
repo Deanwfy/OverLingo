@@ -1,6 +1,37 @@
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::fs;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use tauri::{AppHandle, Manager};
+
+/// A small JSON document in the app's config directory. Anything missing or unreadable
+/// falls back to the default, so a file from an older build still loads.
+pub fn read_config<T: DeserializeOwned + Default>(app: &AppHandle, name: &str) -> T {
+    config_path(app, name)
+        .ok()
+        .and_then(|path| fs::read_to_string(path).ok())
+        .and_then(|content| serde_json::from_str(&content).ok())
+        .unwrap_or_default()
+}
+
+pub fn write_config<T: Serialize>(app: &AppHandle, name: &str, value: &T) -> Result<(), String> {
+    let path = config_path(app, name)?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Failed to create config directory: {error}"))?;
+    }
+    let bytes = serde_json::to_vec_pretty(value)
+        .map_err(|error| format!("Failed to serialize {name}: {error}"))?;
+    write_atomic(&path, &bytes)
+}
+
+pub fn config_path(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
+    app.path()
+        .app_config_dir()
+        .map(|path| path.join(name))
+        .map_err(|error| format!("Failed to resolve config directory: {error}"))
+}
 
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let extension = path

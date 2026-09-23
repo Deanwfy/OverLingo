@@ -1,9 +1,9 @@
 use super::overlay_chrome;
-use super::tray_icon::status_icon;
+use super::tray_icon::{status_icon, update_badge};
 use super::tray_labels::{labels, update_label};
 use crate::app_config::resolve_locale;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::menu::{MenuBuilder, MenuItem, MenuItemBuilder};
+use tauri::menu::{IconMenuItem, IconMenuItemBuilder, MenuBuilder, MenuItem, MenuItemBuilder};
 use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{App, AppHandle, Manager, WebviewWindow, Wry};
 
@@ -12,7 +12,6 @@ const TRANSLATION_ID: &str = "toggle-translation";
 const OVERLAY_ID: &str = "toggle-overlay";
 const UPDATE_ID: &str = "check-update";
 const QUIT_ID: &str = "quit";
-const RELEASES_URL: &str = "https://github.com/Deanwfy/OverLingo/releases/latest";
 
 #[cfg(target_os = "macos")]
 tauri_nspanel::tauri_panel! {
@@ -29,11 +28,14 @@ pub struct TrayItems {
     open: MenuItem<Wry>,
     translation: MenuItem<Wry>,
     overlay: MenuItem<Wry>,
-    update: MenuItem<Wry>,
+    /// An icon item from the start: an icon cannot be added to a plain item later.
+    update: IconMenuItem<Wry>,
     quit: MenuItem<Wry>,
     tray: TrayIcon<Wry>,
     /// What the icon currently shows, so an unchanged state never redraws it.
     running: AtomicBool,
+    /// Likewise for the badge, which is set from every status change.
+    badged: AtomicBool,
 }
 
 pub struct TrayPresentation {
@@ -58,7 +60,8 @@ pub fn install(app: &mut App, locale: &str) -> tauri::Result<()> {
     let open = MenuItemBuilder::with_id(OPEN_ID, labels.open).build(app)?;
     let translation = MenuItemBuilder::with_id(TRANSLATION_ID, labels.start).build(app)?;
     let overlay = MenuItemBuilder::with_id(OVERLAY_ID, labels.show_overlay).build(app)?;
-    let update = MenuItemBuilder::with_id(UPDATE_ID, update_label(&labels, &version)).build(app)?;
+    let update =
+        IconMenuItemBuilder::with_id(UPDATE_ID, update_label(&labels, &version)).build(app)?;
     let quit = MenuItemBuilder::with_id(QUIT_ID, labels.quit).build(app)?;
     let menu = MenuBuilder::new(app)
         .item(&open)
@@ -89,10 +92,7 @@ pub fn install(app: &mut App, locale: &str) -> tauri::Result<()> {
                     .state::<crate::controller::AppController>()
                     .request(crate::controller::ControllerRequest::ToggleOverlay);
             }
-            id if id == UPDATE_ID => {
-                use tauri_plugin_opener::OpenerExt;
-                let _ = app.opener().open_url(RELEASES_URL, None::<&str>);
-            }
+            id if id == UPDATE_ID => crate::updates::open_from_tray(app),
             id if id == QUIT_ID => {
                 let _ = app
                     .state::<crate::controller::AppController>()
@@ -110,6 +110,7 @@ pub fn install(app: &mut App, locale: &str) -> tauri::Result<()> {
         quit,
         tray,
         running: AtomicBool::new(false),
+        badged: AtomicBool::new(false),
     });
 
     if let Some(main) = app.get_webview_window("main") {
@@ -152,6 +153,16 @@ pub fn install(app: &mut App, locale: &str) -> tauri::Result<()> {
 #[tauri::command]
 pub fn show_settings_window(app: AppHandle) -> Result<(), String> {
     show_settings(&app)
+}
+
+/// The badge on the update entry; an unchanged one is left alone.
+pub fn set_update_badge(app: &AppHandle, wanted: bool) {
+    let Some(items) = app.try_state::<TrayItems>() else {
+        return;
+    };
+    if items.badged.swap(wanted, Ordering::Relaxed) != wanted {
+        let _ = items.update.set_icon(wanted.then(update_badge));
+    }
 }
 
 pub fn update_tray_for_app(app: &AppHandle, presentation: TrayPresentation) {

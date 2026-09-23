@@ -101,3 +101,38 @@ export async function setAutostartEnabled(enabled) {
 export async function openAutostartSettings() {
     if (native) await invokeNative('open_autostart_settings');
 }
+
+// Mirrored by the updater endpoint in tauri.conf.json and the opener allowlist in
+// capabilities/default.json.
+export const REPOSITORY_URL = 'https://github.com/Deanwfy/OverLingo';
+
+export async function getUpdateStatus() {
+    return native ? invokeNative('update_status') : (await mock).getUpdateStatus();
+}
+
+export async function onUpdateStatus(handler) {
+    if (!native) return () => {};
+    return listen('updates://status', event => handler(event.payload));
+}
+
+// The tray's update entry, which opens this window on whatever it just announced.
+export async function onUpdateFocus(handler) {
+    if (!native) return () => {};
+    return listen('updates://focus', () => handler());
+}
+
+export async function checkForUpdates() {
+    if (native) await invokeNative('check_for_updates');
+}
+
+export async function setAutoCheckUpdates(enabled) {
+    if (native) await invokeNative('set_auto_check_updates', { enabled });
+}
+
+export async function downloadUpdate() {
+    if (native) await invokeNative('download_update');
+}
+
+export async function installUpdate() {
+    if (native) await invokeNative('install_update');
+}

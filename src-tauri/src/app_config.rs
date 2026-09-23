@@ -1,11 +1,10 @@
 use crate::geometry::Rect;
-use crate::persistence::write_atomic;
+use crate::persistence::{read_config, write_config};
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 const SCHEMA_VERSION: u32 = 1;
+const CONFIG_FILE: &str = "app-config.json";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default, rename_all = "camelCase")]
@@ -185,33 +184,11 @@ impl Default for QwenConfig {
 
 impl AppConfig {
     pub fn load(app: &AppHandle) -> Self {
-        let Ok(path) = config_path(app) else {
-            return Self::default();
-        };
-        let loaded = fs::read_to_string(&path)
-            .ok()
-            .and_then(|content| serde_json::from_str::<Self>(&content).ok());
-
-        match loaded {
-            Some(mut config) => {
-                config.normalize();
-                config
-            }
-            None => Self::default().normalized(),
-        }
+        read_config::<Self>(app, CONFIG_FILE).normalized()
     }
 
     pub fn save(&self, app: &AppHandle) -> Result<(), String> {
-        let mut config = self.clone();
-        config.normalize();
-        let path = config_path(app)?;
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|error| format!("Failed to create config directory: {error}"))?;
-        }
-        let bytes = serde_json::to_vec_pretty(&config)
-            .map_err(|error| format!("Failed to serialize app config: {error}"))?;
-        write_atomic(&path, &bytes)
+        write_config(app, CONFIG_FILE, &self.clone().normalized())
     }
 
     /// Routes on `engine` lose their translator; says whether any did.
@@ -346,13 +323,6 @@ fn normalize_route(route: &mut RouteConfig, input: &str, interface: &str) {
         }
         .into();
     }
-}
-
-fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_config_dir()
-        .map(|path| path.join("app-config.json"))
-        .map_err(|error| format!("Failed to resolve config directory: {error}"))
 }
 
 #[cfg(test)]

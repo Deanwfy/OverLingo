@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { AppState } from '../app/state.svelte';
+    import AboutRow from './AboutRow.svelte';
     import Icon from './Icon.svelte';
 
     let { state }: { state: AppState } = $props();
@@ -44,5 +45,17 @@
                 <i></i>
             </span>
         </label>
+        <label class="settings-row">
+            <span><strong>{state.text('autoCheckUpdates')}</strong></span>
+            <span class="switch">
+                <input
+                    type="checkbox"
+                    checked={state.update.autoCheck}
+                    onchange={(event) => state.updateAutoCheck(event.currentTarget.checked)}
+                />
+                <i></i>
+            </span>
+        </label>
     </section>
+    <AboutRow {state} />
 </div>

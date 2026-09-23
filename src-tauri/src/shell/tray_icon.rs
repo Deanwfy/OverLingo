@@ -149,46 +149,125 @@ fn arc(x: f32, y: f32, corner: Corner) -> [Layer; 2] {
     ]
 }
 
-pub fn status_icon(running: bool) -> Image<'static> {
-    let layers = glyph_layers(running);
-    let scale_x = ICON_REGION.w / ICON_PX_W as f32;
-    let scale_y = ICON_REGION.h / ICON_PX_H as f32;
+/// Supersamples `covered` over each pixel and paints `color` at the resulting coverage.
+/// `region` is the window of the authoring grid the canvas shows.
+fn rasterize(
+    width: u32,
+    height: u32,
+    region: RoundRect,
+    color: [u8; 3],
+    covered: impl Fn(f32, f32) -> bool,
+) -> Image<'static> {
+    let scale_x = region.w / width as f32;
+    let scale_y = region.h / height as f32;
     let step = 1.0 / SUBSAMPLES as f32;
-    let mut rgba = vec![0u8; (ICON_PX_W * ICON_PX_H * 4) as usize];
+    let mut rgba = vec![0u8; (width * height * 4) as usize];
 
-    for y in 0..ICON_PX_H {
-        for x in 0..ICON_PX_W {
+    for y in 0..height {
+        for x in 0..width {
             let mut hits = 0u32;
             for sy in 0..SUBSAMPLES {
                 for sx in 0..SUBSAMPLES {
-                    let px = ICON_REGION.x + (x as f32 + (sx as f32 + 0.5) * step) * scale_x;
-                    let py = ICON_REGION.y + (y as f32 + (sy as f32 + 0.5) * step) * scale_y;
-                    let covered = layers.iter().fold(false, |on, layer| {
-                        if layer.covers(px, py) {
-                            layer.fill
-                        } else {
-                            on
-                        }
-                    });
-                    if covered {
+                    let px = region.x + (x as f32 + (sx as f32 + 0.5) * step) * scale_x;
+                    let py = region.y + (y as f32 + (sy as f32 + 0.5) * step) * scale_y;
+                    if covered(px, py) {
                         hits += 1;
                     }
                 }
             }
             if hits > 0 {
-                let alpha = (hits * 255 / (SUBSAMPLES * SUBSAMPLES)) as u8;
-                let index = ((y * ICON_PX_W + x) * 4) as usize;
-                rgba[index..index + 4].copy_from_slice(&[0, 0, 0, alpha]);
+                let index = ((y * width + x) * 4) as usize;
+                rgba[index..index + 3].copy_from_slice(&color);
+                rgba[index + 3] = (hits * 255 / (SUBSAMPLES * SUBSAMPLES)) as u8;
             }
         }
     }
 
-    Image::new_owned(rgba, ICON_PX_W, ICON_PX_H)
+    Image::new_owned(rgba, width, height)
+}
+
+pub fn status_icon(running: bool) -> Image<'static> {
+    let layers = glyph_layers(running);
+    rasterize(ICON_PX_W, ICON_PX_H, ICON_REGION, [0, 0, 0], |px, py| {
+        layers.iter().fold(
+            false,
+            |on, layer| {
+                if layer.covers(px, py) {
+                    layer.fill
+                } else {
+                    on
+                }
+            },
+        )
+    })
+}
+
+/// The update badge: a dot in the app's accent. Menu item icons are drawn as given, not
+/// tinted like the bar's own glyph, and one bitmap has to read on light and dark menus.
+struct BadgeCanvas {
+    width: u32,
+    height: u32,
+    radius: f32,
+}
+
+/// AppKit scales a menu image to 18pt tall keeping its aspect, so a narrow canvas keeps
+/// the label close; the dot comes out about 4pt, like the unread dots in the bar's menus.
+#[cfg(target_os = "macos")]
+const BADGE: BadgeCanvas = BadgeCanvas {
+    width: 14,
+    height: 32,
+    radius: 3.75,
+};
+
+/// Windows draws the bitmap pixel for pixel and sizes the row to it: check-mark height.
+#[cfg(not(target_os = "macos"))]
+const BADGE: BadgeCanvas = BadgeCanvas {
+    width: 16,
+    height: 16,
+    radius: 3.5,
+};
+
+/// The light-mode accent from tokens.css.
+const BADGE_COLOR: [u8; 3] = [73, 105, 223];
+
+pub fn update_badge() -> Image<'static> {
+    let (width, height) = (BADGE.width as f32, BADGE.height as f32);
+    let dot = disc(width / 2.0, height / 2.0, BADGE.radius);
+    let region = RoundRect::new(0.0, 0.0, width, height, 0.0);
+    rasterize(BADGE.width, BADGE.height, region, BADGE_COLOR, |px, py| {
+        dot.contains(px, py)
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The dot has to be a dot: coloured, round, and clear of the icon box's edges.
+    #[test]
+    fn builds_a_round_coloured_badge() {
+        let badge = update_badge();
+        assert_eq!(badge.width(), BADGE.width);
+        assert_eq!(badge.height(), BADGE.height);
+        let rgba = badge.rgba();
+        let at = |x: u32, y: u32| {
+            let index = ((y * BADGE.width + x) * 4) as usize;
+            (
+                [rgba[index], rgba[index + 1], rgba[index + 2]],
+                rgba[index + 3],
+            )
+        };
+        let (color, alpha) = at(BADGE.width / 2, BADGE.height / 2);
+        assert_eq!(color, BADGE_COLOR);
+        assert_eq!(alpha, 255);
+        assert_eq!(at(0, 0).1, 0);
+        assert_eq!(at(BADGE.width - 1, BADGE.height - 1).1, 0);
+        assert!(rgba
+            .iter()
+            .skip(3)
+            .step_by(4)
+            .any(|&alpha| alpha > 0 && alpha < 255));
+    }
 
     #[test]
     fn builds_template_icon_pixels() {

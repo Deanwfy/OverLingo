@@ -92,6 +92,15 @@ jobs:
         run: |
           [ -n "$APPLE_CERTIFICATE" ] || { echo "::error::macOS builds need APPLE_CERTIFICATE"; exit 1; }
 
+      # Bundles built without it carry no signature, and an installed copy rejects an
+      # unsigned update — which only shows up once users are already on that release.
+      - name: Require an updater signing key
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          [ -n "$TAURI_SIGNING_PRIVATE_KEY" ] || { echo "::error::builds need TAURI_SIGNING_PRIVATE_KEY"; exit 1; }
+
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -101,9 +110,14 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           releaseId: ${{ needs.draft.outputs.release_id }}
           args: --target ${{ matrix.target }}
+          # The manifest must name the NSIS setup: the default MSI cannot take over an
+          # NSIS install, and that is the download most people take.
+          updaterJsonPreferNsis: true
 
       - name: Keep the unpublished bundles
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
@@ -114,6 +128,7 @@ jobs:
             src-tauri/target.noindex/${{ matrix.target }}/release/bundle/dmg/*.dmg
             src-tauri/target.noindex/${{ matrix.target }}/release/bundle/nsis/*.exe
             src-tauri/target.noindex/${{ matrix.target }}/release/bundle/msi/*.msi
+            src-tauri/target.noindex/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz*
           if-no-files-found: error
 
   # Only reached when every target built: a release missing an architecture is
@@ -134,13 +149,41 @@ jobs:
               per_page: 100,
             })
             // Two macOS disk images and, per Windows architecture, an NSIS
-            // installer and an MSI package.
-            const expected = { '.dmg': 2, '.exe': 2, '.msi': 2 }
+            // installer and an MSI package; the macOS updater payloads come as their
+            // own archive, one per architecture, each beside its signature.
+            const expected = {
+              '.dmg': 2,
+              '.exe': 2,
+              '.msi': 2,
+              '.app.tar.gz': 2,
+              '.app.tar.gz.sig': 2,
+            }
+            // Longest match wins, so `.app.tar.gz.sig` never counts as `.app.tar.gz`.
+            const suffixes = Object.keys(expected).sort((a, b) => b.length - a.length)
+            const found = Object.fromEntries(suffixes.map(suffix => [suffix, 0]))
+            for (const asset of assets) {
+              const suffix = suffixes.find(suffix => asset.name.endsWith(suffix))
+              if (suffix) found[suffix] += 1
+            }
             for (const [suffix, count] of Object.entries(expected)) {
-              const found = assets.filter(asset => asset.name.endsWith(suffix)).length
-              if (found !== count) {
-                throw new Error(`expected ${count} ${suffix} assets, found ${found}`)
+              if (found[suffix] !== count) {
+                throw new Error(`expected ${count} ${suffix} assets, found ${found[suffix]}`)
               }
+            }
+
+            // The manifest is what installed copies read, and a missing platform key
+            // strands that architecture on its current version with no sign of trouble.
+            const manifest = assets.find(asset => asset.name === 'latest.json')
+            if (!manifest) throw new Error('the release has no latest.json')
+            const { data: body } = await github.rest.repos.getReleaseAsset({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              asset_id: manifest.id,
+              headers: { accept: 'application/octet-stream' },
+            })
+            const platforms = JSON.parse(Buffer.from(body).toString())?.platforms ?? {}
+            for (const key of ['darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'windows-aarch64']) {
+              if (!platforms[key]?.url) throw new Error(`latest.json is missing ${key}`)
             }
             await github.rest.repos.updateRelease({
               owner: context.repo.owner,

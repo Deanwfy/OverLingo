@@ -320,11 +320,20 @@ impl ControllerActor {
             ControllerRequest::MicrophoneDevice { device } => self.update_microphone_device(device),
             ControllerRequest::RequestCaptureOptions => self.load_capture_options(),
             ControllerRequest::Exit => {
-                self.stop_translation();
-                self.save_config();
+                self.shut_down();
                 crate::exit_now(&self.app);
             }
+            ControllerRequest::Restart => {
+                self.shut_down();
+                self.app.restart();
+            }
         }
+    }
+
+    /// Everything a session leaves behind, put away before the process goes.
+    fn shut_down(&mut self) {
+        self.stop_translation();
+        self.save_config();
     }
 
     fn start_translation(&mut self) {
