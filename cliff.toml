@@ -31,13 +31,13 @@ protect_breaking_commits = true
 commit_parsers = [
   { message = "^chore: release", skip = true },
   { message = "^chore\\(release\\)", skip = true },
+  # A fix for a regression that never shipped, or work with nothing to show.
+  { footer = "^Changelog: skip", skip = true },
+  # No observable change by definition.
+  { message = "^refactor", skip = true },
   { message = "^feat", group = "<!-- 0 -->Features" },
   { message = "^fix", group = "<!-- 1 -->Bug Fixes" },
-  { message = "^perf", group = "<!-- 2 -->Performance" },
-  { message = "^docs", group = "<!-- 3 -->Documentation" },
-  { message = "^refactor|^style", group = "<!-- 4 -->Changes" },
-  { message = "^test|^ci|^build|^chore", group = "<!-- 5 -->Maintenance" },
-  { message = ".*", group = "<!-- 6 -->Other" },
+  { message = ".*", group = "<!-- 2 -->Chore" },
 ]
 filter_commits = false
 tag_pattern = "v[0-9].*"

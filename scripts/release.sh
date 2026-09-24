@@ -35,7 +35,9 @@ sed -i '' "s/^version = \".*\"/version = \"$version\"/" src-tauri/Cargo.toml
 # `npm version` rather than an edit in place: it carries the number into package-lock.json too.
 npm version "$version" --no-git-tag-version >/dev/null
 
-git-cliff --tag "v$version" -o CHANGELOG.md
+# Only the new section is generated; the ones already written stay as they are, edits
+# and all.
+git-cliff --unreleased --tag "v$version" --prepend CHANGELOG.md
 
 npm test
 
