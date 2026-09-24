@@ -5,7 +5,8 @@
 //   node scripts/record-demo.mjs [--lang en|zh] [--fps 12]
 //
 // Serves the preview with Vite, drives headless Chrome over the DevTools protocol, and
-// lets the mock backend play its demo scenes. Needs Chrome, ffmpeg, and img2webp.
+// lets the mock backend play its demo scenes on stage.html, which lays the subtitle box
+// and its control windows out as the app does. Needs Chrome, ffmpeg, and img2webp.
 //
 //   docs/assets/demo.webm, demo.mov       overlay demo with alpha (VP9 / HEVC for Safari)
 //   docs/assets/demo-poster.png           its last frame, transparent
@@ -37,16 +38,21 @@ const root = resolve(fileURLToPath(import.meta.url), "../..");
 const docs = (name) => join(root, "docs/assets", name);
 const github = (name) => join(root, ".github/assets", name);
 
-// The overlay window and, for the recording, the room its shadow needs to fade out.
+// The subtitle box and, for the recording, the room its shadow needs to fade out.
 const PANEL = { width: 760, height: 250 };
 const SHADOW = { css: "0 12px 32px rgba(0, 0, 0, .22)", top: 40, side: 50, bottom: 70 };
+// The toolbar hangs above the box; the captures leave it that much headroom, measured
+// once the page is up. The chrome windows carry a smaller shadow in the recording.
+const TOOLBAR = { height: 0, shadow: "0 6px 16px rgba(0, 0, 0, .22)" };
 const MAIN = { width: 980, height: 650 };
 
 const overlayStage = ({ shadow = false, chrome = "shown", pad }) => `
-    /* overlay.css clips html, body, and #overlay; the shadow has to escape the panel box. */
+    /* base.css clips html, body, and #overlay; the shadow has to escape the panel box. */
     html, body, #overlay { overflow: visible !important; }
     body { padding: ${pad.top}px ${pad.side}px ${pad.bottom}px !important; }
     .overlay-shell { box-shadow: ${shadow ? `${SHADOW.css}, inset 0 1px 0 rgba(255, 255, 255, .07)` : "none"}; }
+    .overlay-chrome nav, .overlay-settings-panel { box-shadow: ${shadow ? TOOLBAR.shadow : "none"}; }
+    ${chrome === "hidden" ? "#toolbar, #panel { display: none; }" : ""}
     .overlay-reveal { opacity: ${chrome === "hidden" ? 0 : 1} !important; transform: none !important; }
 `;
 // The main window as macOS frames it: rounded corners and traffic lights in the title bar.
@@ -59,12 +65,12 @@ const mainStage = `
         background: #ff5f57; box-shadow: 20px 0 0 #febc2e, 40px 0 0 #28c840; transform: translateY(-50%);
     }
 `;
-// The social card: the brand over the wallpaper, with the final frame of the demo laid out
-// so the panel itself is 1132px wide with its top edge at 186px.
+// The social card: the brand as a heading, then the toolbar, then the subtitle box, each
+// on a row of its own; the box is 1080px wide with its top edge at 236px.
 const socialCard = (poster) => {
-    const canvas = { width: PANEL.width + 2 * SHADOW.side, height: PANEL.height + SHADOW.top + SHADOW.bottom };
-    const width = (1132 / PANEL.width) * canvas.width;
-    const top = 186 - (SHADOW.top / canvas.width) * width;
+    const box = { width: 1080, top: 236 };
+    const scale = box.width / PANEL.width;
+    const left = (1280 - box.width) / 2;
     return `<!doctype html><meta charset="utf-8">
 <style>
   html, body { margin: 0; width: 1280px; height: 640px; overflow: hidden; }
@@ -72,10 +78,11 @@ const socialCard = (poster) => {
     background: radial-gradient(55% 60% at 12% 0%, rgba(73, 105, 223, .16), transparent 70%),
       radial-gradient(45% 50% at 90% 20%, rgba(35, 138, 89, .1), transparent 70%),
       linear-gradient(180deg, #eceef5 0%, #e4e7f0 100%); }
-  .brand { position: absolute; left: 0; right: 0; top: 52px; display: flex; justify-content: center; align-items: center; gap: 20px; }
-  .brand img { width: 88px; height: 88px; filter: drop-shadow(0 8px 20px rgba(36, 55, 143, .25)); }
-  .brand h1 { margin: 0; font-size: 68px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
-  .panel { position: absolute; left: 50%; top: ${top.toFixed(1)}px; width: ${width.toFixed(1)}px; transform: translateX(-50%); }
+  .brand { position: absolute; left: ${left}px; top: 42px; display: flex; align-items: center; gap: 20px; }
+  .brand img { width: 104px; height: 104px; filter: drop-shadow(0 8px 20px rgba(36, 55, 143, .25)); }
+  .brand h1 { margin: 0; font-size: 80px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+  .panel { position: absolute; left: ${(left - SHADOW.side * scale).toFixed(1)}px; top: ${(box.top - (SHADOW.top + TOOLBAR.height) * scale).toFixed(1)}px;
+    width: ${((PANEL.width + 2 * SHADOW.side) * scale).toFixed(1)}px; }
 </style>
 <div class="brand"><img src="file://${join(root, "docs/icon.svg")}"><h1>OverLingo</h1></div>
 <img class="panel" src="file://${poster}">`;
@@ -99,7 +106,7 @@ children.push(vite);
 const origin = `http://127.0.0.1:${PORT}`;
 for (let tries = 0; ; tries++) {
     try {
-        if ((await fetch(origin + "/overlay.html")).ok) break;
+        if ((await fetch(origin + "/stage.html")).ok) break;
     } catch {}
     if (tries > 100) throw new Error("Vite did not start");
     await new Promise((r) => setTimeout(r, 200));
@@ -204,10 +211,11 @@ async function open({ url, width, height, stage, scale = 2 }) {
 // Overlay pages. The saved config is dropped first so one scene's layout cannot leak into
 // the next; saved sessions are kept, the history screenshot wants them.
 async function openOverlay({ scene = "meeting", speed, layout, shadow = false, chrome = "shown", panel = PANEL }) {
-    const pad = shadow ? SHADOW : { top: 0, side: 0, bottom: 0 };
+    const pad = shadow ? { ...SHADOW } : { top: 0, side: 0, bottom: 0 };
+    if (chrome !== "hidden") pad.top += TOOLBAR.height;
     await evaluate(`localStorage.removeItem("overlingo-config"); true`);
     await open({
-        url: `${origin}/overlay.html?autostart&scene=${scene}&speed=${speed}${layout ? `&layout=${layout}` : ""}`,
+        url: `${origin}/stage.html?autostart&scene=${scene}&speed=${speed}${layout ? `&layout=${layout}` : ""}`,
         width: panel.width + 2 * pad.side,
         height: panel.height + pad.top + pad.bottom,
         stage: overlayStage({ shadow, chrome, pad }),
@@ -222,8 +230,10 @@ const stillTo = async (...files) => {
 };
 
 // 1. The demo, recorded frame by frame at quarter speed.
-await open({ url: `${origin}/overlay.html`, width: 100, height: 100 });
+await open({ url: `${origin}/stage.html`, width: 100, height: 100 });
 await evaluate(`localStorage.clear(); true`);
+await waitFor(`document.getElementById("toolbar").offsetHeight > 0`);
+TOOLBAR.height = await evaluate(`document.getElementById("toolbar").offsetHeight`);
 await openOverlay({ speed: 1 / SLOWDOWN, shadow: true });
 console.log("labels:", await evaluate(`[...document.querySelectorAll(".route-direction, .translation-control")].map((n) => n.textContent.trim()).join(" | ")`));
 const frames = [];
@@ -263,7 +273,7 @@ await stillTo(docs("overlay-merged.png"), github("overlay-merged.png"));
 
 await openOverlay({ speed: 4, panel: { width: 1080, height: 580 } });
 await demoFinished();
-await evaluate(`document.querySelector(".overlay-chrome button[aria-expanded]").click(); true`);
+await evaluate(`document.querySelector("#toolbar button[aria-expanded]").click(); true`);
 await sleep(400);
 await stillTo(docs("overlay-settings.png"), github("overlay-settings.png"));
 

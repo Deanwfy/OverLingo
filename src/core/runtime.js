@@ -56,6 +56,7 @@ export async function setOverlayInteractiveHeight(height) {
 
 export async function setOverlaySettingsOpen(open) {
     if (native) await invokeNative('set_overlay_settings_open', { open });
+    else await (await mock).setOverlaySettingsOpen(open);
 }
 
 export async function setOverlayChromeSize({ width, height, anchor }) {
@@ -71,7 +72,7 @@ export async function dragOverlay(begin, edge = null) {
 // The panel is a window of its own, so its open state is kept by the backend and
 // announced to both control windows.
 export async function onOverlaySettingsOpen(handler) {
-    if (!native) return () => {};
+    if (!native) return (await mock).onOverlaySettingsOpen(handler);
     return listen('overlay://settings-open', event => handler(Boolean(event.payload)));
 }
 

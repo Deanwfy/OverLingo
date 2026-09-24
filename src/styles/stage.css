@@ -1,0 +1,27 @@
+/* The subtitle box fills the page; the control windows hang off it as overlay_chrome.rs
+   places them: the toolbar on the box's top-right corner, the panel below the toolbar. */
+#stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+#toolbar,
+#panel {
+    position: absolute;
+}
+
+#toolbar {
+    right: 0;
+    bottom: 100%;
+    z-index: 2;
+}
+
+#panel {
+    top: 0;
+    z-index: 3;
+}
+
+#stage .overlay-chrome-shell {
+    position: static;
+}

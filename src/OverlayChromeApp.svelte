@@ -17,7 +17,10 @@
     } from './core/runtime.js';
 
     // One page serves both control windows; the backend opens the panel's with ?view=panel.
-    const view = new URLSearchParams(location.search).get('view') === 'panel' ? 'panel' : 'toolbar';
+    // The browser preview mounts both in one page and says which is which instead.
+    let { view = new URLSearchParams(location.search).get('view') === 'panel' ? 'panel' : 'toolbar' }: {
+        view?: 'toolbar' | 'panel';
+    } = $props();
 
     let chromeState = $state<ControllerSnapshot | null>(null);
     let settingsOpen = $state(false);

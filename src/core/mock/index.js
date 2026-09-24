@@ -2,4 +2,5 @@
 // runtime.js loads it only in dev builds when isTauri() is false.
 
 export { getAutostartStatus, getUpdateStatus, invoke, setAutostartEnabled } from './commands.js';
+export { onOverlaySettingsOpen, setOverlaySettingsOpen } from './chrome.js';
 export { sendControllerAction, subscribeController } from './controller.js';
