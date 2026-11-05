@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 const SONIOX_REALTIME_URL: &str = "wss://stt-rt.soniox.com/transcribe-websocket";
-const MODEL: &str = "stt-rt-v5";
+const MODEL: &str = "stt-rt-v6";
 /// Soniox marks the end of an utterance with this token rather than a message flag.
 const END_TOKEN: &str = "<end>";
 

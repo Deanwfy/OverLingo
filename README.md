@@ -59,7 +59,7 @@ On first use, macOS asks for system audio recording permission, and for micropho
 
 - Alibaba Cloud Model Studio: [Qwen3.5 LiveTranslate Flash Realtime](https://www.alibabacloud.com/help/en/model-studio/qwen3-5-livetranslate-flash-realtime)
 - OpenAI: [GPT Realtime Translate](https://developers.openai.com/api/docs/guides/realtime-translation)
-- Soniox: [Real-time STT v5](https://soniox.com/docs/translation/stt-translation/rt-translation)
+- Soniox: [Real-time STT v6](https://soniox.com/docs/translation/stt-translation/rt-translation)
 
 ## Privacy
 

@@ -32,9 +32,9 @@ const TRANSLATORS = [
         languages: OPENAI_LANGUAGES,
     },
     {
-        id: 'stt-rt-v5',
+        id: 'stt-rt-v6',
         provider: 'soniox',
-        name: 'Soniox Real-time STT v5',
+        name: 'Soniox Real-time STT v6',
         languages: SONIOX_LANGUAGES,
     },
 ];

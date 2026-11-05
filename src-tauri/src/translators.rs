@@ -135,7 +135,7 @@ const TRANSLATORS: &[Translator] = &[
         languages: None,
     },
     Translator {
-        id: "stt-rt-v5",
+        id: "stt-rt-v6",
         engine: "soniox",
         languages: Some(SONIOX_LANGUAGES),
     },
@@ -315,7 +315,7 @@ mod tests {
     /// The picker lets a half-edited route through, so this is the only gate before a dial.
     #[test]
     fn a_route_is_invalid_until_the_whole_combination_works() {
-        let soniox = "stt-rt-v5";
+        let soniox = "stt-rt-v6";
         let qwen = "qwen3.5-livetranslate-flash-realtime";
         let unsupported = Some("unsupportedLanguage");
 

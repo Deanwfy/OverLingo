@@ -425,7 +425,7 @@ mod tests {
         for route in [&config.routes.system, &config.routes.microphone] {
             for model in [
                 "qwen3.5-livetranslate-flash-realtime",
-                "stt-rt-v5",
+                "stt-rt-v6",
                 "gpt-realtime-translate",
             ] {
                 assert_eq!(
