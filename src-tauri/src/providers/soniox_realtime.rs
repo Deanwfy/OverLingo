@@ -5,12 +5,12 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 const SONIOX_REALTIME_URL: &str = "wss://stt-rt.soniox.com/transcribe-websocket";
-const MODEL: &str = "stt-rt-v6";
 /// Soniox marks the end of an utterance with this token rather than a message flag.
 const END_TOKEN: &str = "<end>";
 
 pub struct SonioxRealtimeConfig {
     pub api_key: String,
+    pub model: String,
     pub source_language: String,
     pub target_language: String,
 }
@@ -136,7 +136,7 @@ fn sanitize_error(cfg: &SonioxRealtimeConfig, message: String) -> String {
 fn build_config(cfg: &SonioxRealtimeConfig) -> String {
     serde_json::json!({
         "api_key": cfg.api_key,
-        "model": MODEL,
+        "model": cfg.model,
         "audio_format": "pcm_s16le",
         "sample_rate": 16_000,
         "num_channels": 1,
@@ -302,10 +302,12 @@ mod tests {
     fn config_requests_both_directions_as_raw_pcm() {
         let config = SonioxRealtimeConfig {
             api_key: "test".into(),
+            model: "stt-rt-v6".into(),
             source_language: "en".into(),
             target_language: "zh".into(),
         };
         let value: serde_json::Value = serde_json::from_str(&build_config(&config)).unwrap();
+        assert_eq!(value["model"], "stt-rt-v6");
         assert_eq!(value["audio_format"], "pcm_s16le");
         assert_eq!(value["sample_rate"], 16_000);
         assert_eq!(value["language_hints"][0], "en");

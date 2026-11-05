@@ -423,11 +423,7 @@ mod tests {
         assert_eq!(config.routes.microphone.target_language, "zh");
 
         for route in [&config.routes.system, &config.routes.microphone] {
-            for model in [
-                "qwen3.5-livetranslate-flash-realtime",
-                "stt-rt-v6",
-                "gpt-realtime-translate",
-            ] {
+            for model in crate::translators::model_ids() {
                 assert_eq!(
                     crate::translators::route_config_error(
                         model,
@@ -453,7 +449,7 @@ mod tests {
         let retired = retired.normalized();
         assert_eq!(
             retired.routes.system.model,
-            "qwen3.5-livetranslate-flash-realtime"
+            crate::translators::default_model("qwen")
         );
         assert_eq!(retired.routes.system.engine, "qwen");
 
@@ -467,15 +463,16 @@ mod tests {
 
     #[test]
     fn clearing_a_key_unsets_the_routes_on_that_translator() {
+        let openai = crate::translators::default_model("openai");
         let mut config = AppConfig::default();
-        config.routes.system.model = "qwen3.5-livetranslate-flash-realtime".into();
-        config.routes.microphone.model = "gpt-realtime-translate".into();
+        config.routes.system.model = crate::translators::default_model("qwen").into();
+        config.routes.microphone.model = openai.into();
         let mut config = config.normalized();
 
         assert!(config.drop_engine("qwen"));
         assert_eq!(config.routes.system.model, "");
         assert_eq!(config.routes.system.engine, "");
-        assert_eq!(config.routes.microphone.model, "gpt-realtime-translate");
+        assert_eq!(config.routes.microphone.model, openai);
         assert!(!config.drop_engine("qwen"));
     }
 

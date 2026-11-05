@@ -1,0 +1,25 @@
+[
+    {
+        "id": "qwen3.5-livetranslate-flash-realtime",
+        "provider": "qwen",
+        "name": "Qwen3.5 LiveTranslate Flash Realtime",
+        "languages": null
+    },
+    {
+        "id": "stt-rt-v6",
+        "provider": "soniox",
+        "name": "Soniox Real-time STT v6",
+        "languages": [
+            "af", "ar", "az", "be", "bg", "bn", "bs", "ca", "cs", "cy", "da", "de", "el", "en", "es", "et",
+            "eu", "fa", "fi", "fr", "gl", "gu", "he", "hi", "hr", "hu", "id", "it", "ja", "kk", "kn", "ko",
+            "lt", "lv", "mk", "ml", "mr", "ms", "nl", "no", "pa", "pl", "pt", "ro", "ru", "sk", "sl", "sq",
+            "sr", "sv", "sw", "ta", "te", "th", "tl", "tr", "uk", "ur", "vi", "zh"
+        ]
+    },
+    {
+        "id": "gpt-realtime-translate",
+        "provider": "openai",
+        "name": "GPT Realtime Translate",
+        "languages": ["zh", "en", "fr", "de", "hi", "id", "it", "ja", "ko", "pt", "ru", "es", "vi"]
+    }
+]

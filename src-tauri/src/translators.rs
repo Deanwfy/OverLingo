@@ -4,6 +4,8 @@ use crate::providers::openai_realtime::{self, OpenAiRealtimeConfig};
 use crate::providers::qwen_realtime::{self, QwenRealtimeConfig};
 use crate::providers::soniox_realtime::{self, SonioxRealtimeConfig};
 use crate::providers::{Events, ProviderState};
+use serde::Deserialize;
+use std::sync::LazyLock;
 
 /// Everything one route needs to dial its translator. `api_key` is resolved from the
 /// store by engine id, so no provider names itself twice.
@@ -79,6 +81,7 @@ const ENGINES: &[Engine] = &[
             soniox_realtime::start_session(
                 SonioxRealtimeConfig {
                     api_key: request.api_key.to_owned(),
+                    model: request.route.model.clone(),
                     source_language: request.route.source_language.clone(),
                     target_language: request.route.target_language.clone(),
                 },
@@ -95,6 +98,7 @@ const ENGINES: &[Engine] = &[
             openai_realtime::start_session(
                 OpenAiRealtimeConfig {
                     api_key: request.api_key.to_owned(),
+                    model: request.route.model.clone(),
                     target_language: request.route.target_language.clone(),
                 },
                 events,
@@ -106,45 +110,25 @@ const ENGINES: &[Engine] = &[
 
 /// A single translator model. `engine` names the provider that owns its API key; a provider
 /// with several models contributes several entries, so nothing downstream unpacks a nested list.
+#[derive(Deserialize)]
 struct Translator {
-    id: &'static str,
-    engine: &'static str,
+    id: String,
+    #[serde(rename = "provider")]
+    engine: String,
     /// `None` when the model accepts any language pair.
-    languages: Option<&'static [&'static str]>,
+    languages: Option<Vec<String>>,
 }
 
-/// The 13 languages GPT Realtime Translate can translate *into*. Its input side accepts
-/// 70+, including Arabic, but a route needs both ends, so the narrower set governs.
-const OPENAI_LANGUAGES: &[&str] = &[
-    "zh", "en", "fr", "de", "hi", "id", "it", "ja", "ko", "pt", "ru", "es", "vi",
-];
-
-/// Soniox transcribes and translates across one shared ISO 639-1 set. Codes outside it —
-/// `yue` and the other non-639-1 entries in the interface catalog — are rejected upstream.
-const SONIOX_LANGUAGES: &[&str] = &[
-    "af", "ar", "az", "be", "bg", "bn", "bs", "ca", "cs", "da", "de", "el", "en", "es", "et", "fa",
-    "fi", "fr", "gl", "gu", "he", "hi", "hr", "hu", "id", "it", "ja", "jv", "kk", "kn", "ko", "ky",
-    "lv", "mk", "ml", "mr", "ms", "nl", "pa", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "sw", "ta",
-    "te", "tg", "th", "tl", "tr", "uk", "ur", "vi", "zh",
-];
-
-const TRANSLATORS: &[Translator] = &[
-    Translator {
-        id: "qwen3.5-livetranslate-flash-realtime",
-        engine: "qwen",
-        languages: None,
-    },
-    Translator {
-        id: "stt-rt-v6",
-        engine: "soniox",
-        languages: Some(SONIOX_LANGUAGES),
-    },
-    Translator {
-        id: "gpt-realtime-translate",
-        engine: "openai",
-        languages: Some(OPENAI_LANGUAGES),
-    },
-];
+/// The model catalog, read from the same file as the interface so the two cannot drift.
+/// - A provider's first entry is the model a retired route falls back to.
+/// - GPT Realtime Translate lists the 13 languages it translates *into*. Its input side
+///   accepts 70+, but a route needs both ends, so the narrower set governs.
+/// - Soniox's list is what `GET /v1/models` returns for the model. Codes outside it — `yue`
+///   and the other non-639-1 entries in the interface catalog — are rejected upstream.
+static TRANSLATORS: LazyLock<Vec<Translator>> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../src/core/translators.json"))
+        .expect("src/core/translators.json is a valid catalog")
+});
 
 fn translator(model: &str) -> Option<&'static Translator> {
     TRANSLATORS.iter().find(|entry| entry.id == model)
@@ -155,7 +139,7 @@ fn engine(id: &str) -> Option<&'static Engine> {
 }
 
 pub(crate) fn engine_of(model: &str) -> Option<&'static str> {
-    translator(model).map(|entry| entry.engine)
+    translator(model).map(|entry| entry.engine.as_str())
 }
 
 pub(crate) fn is_known_engine(id: &str) -> bool {
@@ -231,13 +215,18 @@ pub(crate) fn default_model(engine: &str) -> &'static str {
     TRANSLATORS
         .iter()
         .find(|entry| entry.engine == engine)
-        .map_or("", |entry| entry.id)
+        .map_or("", |entry| entry.id.as_str())
+}
+
+#[cfg(test)]
+pub(crate) fn model_ids() -> impl Iterator<Item = &'static str> {
+    TRANSLATORS.iter().map(|entry| entry.id.as_str())
 }
 
 fn supports_language(model: &str, language: &str) -> bool {
-    translator(model).is_some_and(|entry| match entry.languages {
+    translator(model).is_some_and(|entry| match &entry.languages {
         None => true,
-        Some(languages) => languages.contains(&language),
+        Some(languages) => languages.iter().any(|code| code == language),
     })
 }
 
@@ -247,10 +236,10 @@ mod tests {
 
     #[test]
     fn model_ids_are_unique_and_dispatchable() {
-        for entry in TRANSLATORS {
-            assert!(is_known_engine(entry.engine), "{}", entry.id);
+        for entry in TRANSLATORS.iter() {
+            assert!(is_known_engine(&entry.engine), "{}", entry.id);
             // A duplicate id would resolve to the earlier entry instead of this one.
-            assert_eq!(engine_of(entry.id), Some(entry.engine));
+            assert_eq!(engine_of(&entry.id), Some(entry.engine.as_str()));
         }
     }
 
@@ -315,8 +304,9 @@ mod tests {
     /// The picker lets a half-edited route through, so this is the only gate before a dial.
     #[test]
     fn a_route_is_invalid_until_the_whole_combination_works() {
-        let soniox = "stt-rt-v6";
-        let qwen = "qwen3.5-livetranslate-flash-realtime";
+        let soniox = default_model("soniox");
+        let qwen = default_model("qwen");
+        let openai = default_model("openai");
         let unsupported = Some("unsupportedLanguage");
 
         assert_eq!(
@@ -328,10 +318,7 @@ mod tests {
         assert_eq!(route_config_error(soniox, "yue", "en"), unsupported);
         assert_eq!(route_config_error(soniox, "en", "yue"), unsupported);
         assert_eq!(route_config_error(soniox, "en", "zh"), None);
-        assert_eq!(
-            route_config_error("gpt-realtime-translate", "en", "nl"),
-            unsupported
-        );
+        assert_eq!(route_config_error(openai, "en", "nl"), unsupported);
         // Qwen takes the whole catalog, so the pair Soniox refused stays valid there.
         assert_eq!(route_config_error(qwen, "yue", "en"), None);
     }
@@ -351,11 +338,9 @@ mod tests {
 
     #[test]
     fn narrow_models_reject_unsupported_languages() {
-        assert!(supports_language("gpt-realtime-translate", "ja"));
-        assert!(!supports_language("gpt-realtime-translate", "nl"));
-        assert!(supports_language(
-            "qwen3.5-livetranslate-flash-realtime",
-            "nl"
-        ));
+        let openai = default_model("openai");
+        assert!(supports_language(openai, "ja"));
+        assert!(!supports_language(openai, "nl"));
+        assert!(supports_language(default_model("qwen"), "nl"));
     }
 }

@@ -1,4 +1,5 @@
 import { locale } from '../core/i18n.js';
+import { defaultModel } from '../core/translators.js';
 import type { AppConfig, UpdateStatus } from './types';
 
 // Mirrors interface_language() in app_config.rs. Only the placeholder shown before the
@@ -24,7 +25,7 @@ export const DEFAULT_CONFIG: AppConfig = {
             enabled: true,
             input: 'system',
             engine: 'qwen',
-            model: 'qwen3.5-livetranslate-flash-realtime',
+            model: defaultModel('qwen'),
             sourceLanguage: counterpartLanguage(),
             targetLanguage: interfaceLanguage(),
         },
@@ -32,7 +33,7 @@ export const DEFAULT_CONFIG: AppConfig = {
             enabled: true,
             input: 'microphone',
             engine: 'qwen',
-            model: 'qwen3.5-livetranslate-flash-realtime',
+            model: defaultModel('qwen'),
             sourceLanguage: interfaceLanguage(),
             targetLanguage: counterpartLanguage(),
         },

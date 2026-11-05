@@ -435,6 +435,13 @@ mod tests {
         }
     }
 
+    /// The wire protocol here is written for one model version, so a catalog bump has to
+    /// come with a look at this provider.
+    #[test]
+    fn speaks_the_catalog_model() {
+        assert_eq!(crate::translators::default_model("qwen"), CURRENT_MODEL);
+    }
+
     #[test]
     fn rejects_retired_models() {
         let cfg = config("beijing", "ws-123", "qwen3-livetranslate-flash-realtime");

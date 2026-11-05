@@ -8,13 +8,13 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-const OPENAI_REALTIME_URL: &str =
-    "wss://api.openai.com/v1/realtime/translations?model=gpt-realtime-translate";
+const OPENAI_REALTIME_URL: &str = "wss://api.openai.com/v1/realtime/translations";
 
 /// No source language: the translation endpoint detects it from the audio and rejects
 /// `session.audio.input.transcription.language` as an unknown parameter.
 pub struct OpenAiRealtimeConfig {
     pub api_key: String,
+    pub model: String,
     pub target_language: String,
 }
 
@@ -124,7 +124,7 @@ async fn run_session(
     events: Events,
 ) -> Result<(), String> {
     let request = Request::builder()
-        .uri(OPENAI_REALTIME_URL)
+        .uri(format!("{OPENAI_REALTIME_URL}?model={}", cfg.model))
         .header("Authorization", format!("Bearer {}", cfg.api_key))
         .header("Host", "api.openai.com")
         .header("Connection", "Upgrade")
@@ -323,6 +323,7 @@ mod tests {
     fn session_update_sets_the_output_language_only() {
         let config = OpenAiRealtimeConfig {
             api_key: "test".into(),
+            model: "gpt-realtime-translate".into(),
             target_language: "en".into(),
         };
         let value: serde_json::Value =
@@ -422,6 +423,7 @@ mod tests {
     fn redacts_credentials_from_connection_errors() {
         let config = OpenAiRealtimeConfig {
             api_key: "secret-key".into(),
+            model: "gpt-realtime-translate".into(),
             target_language: "zh".into(),
         };
         let message = sanitize_error(&config, "request secret-key failed".into());
