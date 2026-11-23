@@ -2,6 +2,17 @@
 
 All notable changes to OverLingo are documented in this file.
 
+## [1.4.0](https://github.com/Deanwfy/OverLingo/compare/v1.3.0...v1.4.0) - 2026-11-23
+
+### Features
+
+- Add Qwen3.8 LiveTranslate and widen the languages each model offers
+
+### Bug Fixes
+
+- Keep the unfinished subtitle when a session ends
+
+
 ## [1.3.0](https://github.com/Deanwfy/OverLingo/compare/v1.2.0...v1.3.0) - 2026-11-20
 
 ### Features
