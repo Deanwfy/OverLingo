@@ -1,6 +1,6 @@
 use super::provider::{self, Handle as ProviderHandle};
 use super::state::RouteState;
-use super::transcript::TurnAssembler;
+use super::transcript::{TranscriptTurn, TurnAssembler};
 use crate::app_config::{AppConfig, RouteConfig};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -190,6 +190,12 @@ impl ActiveRoute {
 
     pub(super) fn is_ready(&self) -> bool {
         self.provider.is_some_and(|session| session.ready)
+    }
+
+    /// Called wherever the provider slot is vacated, so no ending session leaves its open
+    /// segment behind or labels later turns with settings that no longer apply.
+    pub(super) fn close_transcript(&mut self) -> Vec<TranscriptTurn> {
+        self.assembler.finish(&self.config)
     }
 
     pub(super) fn handles(&self) -> impl Iterator<Item = ProviderHandle> {

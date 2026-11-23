@@ -1,7 +1,7 @@
 use super::provider::{self, Event as ProviderEvent, FragmentKind};
 use super::route::{ActiveRoute, CaptureKey, ProviderKey, Session};
 use super::state::{ClockChange, RouteState, TranslationState};
-use super::transcript::{TranscriptTurn, TurnAssembler};
+use super::transcript::TranscriptTurn;
 use super::{Action, ControllerActor, MICROPHONE_ROUTE, ROUTE_IDS};
 use crate::audio::capture::{AudioSink, AudioState, CaptureRequest};
 use crate::diagnostics;
@@ -66,7 +66,7 @@ impl ControllerActor {
             provider::stop(&self.app, handle);
         }
         route.bridge.detach();
-        let outputs = route.assembler.flush_all();
+        let outputs = route.close_transcript();
         self.record_turns(route_id, outputs);
     }
 
@@ -147,13 +147,16 @@ impl ControllerActor {
         // during the handover; a half-open one is cheaper to discard.
         let handover = route.is_ready();
         let mut retired = Vec::from_iter(route.pending.take());
+        let mut outputs = Vec::new();
         if !handover {
             retired.extend(route.provider.take());
             route.bridge.detach();
+            outputs = route.close_transcript();
         }
         for session in retired {
             provider::stop(&self.app, session.handle);
         }
+        self.record_turns(route_id, outputs);
         self.start_provider(route_id, handover);
     }
 
@@ -268,10 +271,7 @@ impl ControllerActor {
         session.token = token;
         let retired = route.provider.replace(session);
         route.bridge.attach(&self.app, session.handle);
-        // The retired session's turns carry the old languages, so close them out before
-        // the assembler adopts the new route config.
-        let outputs = route.assembler.flush_all();
-        route.assembler = TurnAssembler::new(route_id, &route.config);
+        let outputs = route.close_transcript();
         route.reconfiguring = false;
         route.reconnect_attempt = 0;
         route.error.clear();
@@ -435,6 +435,7 @@ impl ControllerActor {
         route.reconfiguring = false;
         route.error = error.clone();
         route.bridge.detach();
+        let outputs = route.close_transcript();
         let retrying = route.reconnect_attempt < MAX_RECONNECT_ATTEMPTS;
         if retrying {
             route.reconnect_attempt += 1;
@@ -453,6 +454,7 @@ impl ControllerActor {
         for handle in retired {
             provider::stop(&self.app, handle);
         }
+        self.record_turns(route_id, outputs);
 
         if retrying {
             let retry = self.next_sequence();

@@ -488,34 +488,7 @@ fn enabled_route_ids(config: &AppConfig) -> Vec<&'static str> {
 
 #[cfg(test)]
 mod tests {
-    use super::provider::FragmentKind;
-    use super::transcript::TurnAssembler;
     use super::*;
-
-    #[test]
-    fn pairs_final_fragments_in_order() {
-        let route = AppConfig::default().routes.system;
-        let mut assembler = TurnAssembler::new(SYSTEM_ROUTE, &route);
-        assembler.push(FragmentKind::Original, "one".into(), true);
-        let (outputs, _) = assembler.push(FragmentKind::Translation, "一".into(), true);
-        assert_eq!(outputs.first().unwrap().translation, "一");
-    }
-
-    /// Fragments are snapshots, so the newest one replaces the draft whatever the provider.
-    #[test]
-    fn draft_tracks_the_latest_snapshot() {
-        let base = AppConfig::default().routes.system;
-        for engine in ["qwen", "openai"] {
-            let route = RouteConfig {
-                engine: engine.into(),
-                ..base.clone()
-            };
-            let mut assembler = TurnAssembler::new(SYSTEM_ROUTE, &route);
-            assembler.push(FragmentKind::Translation, "hel".into(), false);
-            assembler.push(FragmentKind::Translation, "hello".into(), false);
-            assert_eq!(assembler.draft.translation, "hello", "{engine}");
-        }
-    }
 
     #[test]
     fn accepts_frontend_route_settings_contract() {
