@@ -12,7 +12,6 @@ pub(super) type Handle = u64;
 pub(super) fn start(
     app: &AppHandle,
     config: &AppConfig,
-    route_id: &str,
     route: &RouteConfig,
     on_event: impl Fn(Event) + Send + Sync + 'static,
 ) -> Result<Handle, String> {
@@ -26,7 +25,6 @@ pub(super) fn start(
     crate::translators::open_session(
         config,
         route,
-        route_id,
         &credentials,
         Events::callback(on_event),
         &app.state::<ProviderState>(),

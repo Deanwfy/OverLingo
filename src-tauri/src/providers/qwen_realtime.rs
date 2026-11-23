@@ -1,10 +1,12 @@
-use super::{connect_error, Connection, Event, Events, FragmentKind, Joined, ProviderState};
+use super::{
+    close_reason, dial, Connection, Event, Events, FragmentKind, Joined, ProviderState, SessionLog,
+};
+use crate::diagnostics::field;
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures_util::{SinkExt, StreamExt};
 use http::Request;
-use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::tungstenite::Message;
 
 /// LiveTranslate's session setup and its streaming events change between model versions,
 /// so the catalog names the version each model speaks.
@@ -35,7 +37,6 @@ pub struct QwenRealtimeConfig {
     pub workspace_id: String,
     pub model: String,
     pub protocol: Protocol,
-    pub route_id: String,
 }
 
 struct Session {
@@ -62,39 +63,31 @@ pub fn start_session(
 ) -> Result<u64, String> {
     let (audio_tx, audio_rx) = mpsc::unbounded_channel::<Vec<u8>>();
     let (stop_tx, stop_rx) = mpsc::unbounded_channel::<()>();
-
-    let id = state.start(Session { audio_tx, stop_tx }, move |id| async move {
-        diagnostic_log(
-            id,
-            format!(
-                "start route={} model={} region={} source={} target={} workspace_configured={}",
-                diagnostic_field(&config.route_id),
-                diagnostic_field(&config.model),
-                diagnostic_field(&config.region),
-                diagnostic_field(&config.source_language),
-                diagnostic_field(&config.target_language),
-                !config.workspace_id.trim().is_empty(),
-            ),
-        );
-        if let Err(error) = run_session(id, config, audio_rx, stop_rx, events.clone()).await {
-            diagnostic_log(id, format!("failed error={error}"));
-            events.emit(Event::Error(error));
-        }
-        events.emit(Event::Closed("session_ended".into()));
-        diagnostic_log(id, "ended");
-    });
-    Ok(id)
+    let details = format!(
+        "model={} region={} source={} target={} workspace_configured={}",
+        field(&config.model),
+        field(&config.region),
+        field(&config.source_language),
+        field(&config.target_language),
+        !config.workspace_id.trim().is_empty(),
+    );
+    Ok(state.start(
+        "qwen",
+        details,
+        Session { audio_tx, stop_tx },
+        events,
+        move |log, events| run_session(log, config, audio_rx, stop_rx, events),
+    ))
 }
 
 async fn run_session(
-    session_id: u64,
+    log: SessionLog,
     cfg: QwenRealtimeConfig,
     mut audio_rx: mpsc::UnboundedReceiver<Vec<u8>>,
     mut stop_rx: mpsc::UnboundedReceiver<()>,
     events: Events,
 ) -> Result<(), String> {
     let (qwen_realtime_url, qwen_host) = build_qwen_endpoint(&cfg)?;
-    diagnostic_log(session_id, "endpoint_ready");
     let request = Request::builder()
         .uri(qwen_realtime_url.as_str())
         .header("Authorization", format!("Bearer {}", cfg.api_key))
@@ -109,34 +102,21 @@ async fn run_session(
         .body(())
         .map_err(|e| sanitize_error(&cfg, format!("build request: {e}")))?;
 
-    diagnostic_log(session_id, "websocket_handshake_start");
-    let connect = tokio::time::timeout(Duration::from_secs(14), connect_async(request));
-    tokio::pin!(connect);
-    let (ws_stream, response) = tokio::select! {
-        result = &mut connect => {
-            result
-                .map_err(|_| "websocket handshake timed out".to_string())?
-                .map_err(|e| sanitize_error(&cfg, connect_error(&e)))?
-        }
-        _ = stop_rx.recv() => {
-            diagnostic_log(session_id, "websocket_handshake_cancelled");
-            return Ok(());
-        }
+    let Some(ws_stream) = dial(&log, request, &mut stop_rx)
+        .await
+        .map_err(|error| sanitize_error(&cfg, error))?
+    else {
+        return Ok(());
     };
-    diagnostic_log(
-        session_id,
-        format!("websocket_handshake_ok status={}", response.status()),
-    );
 
     let (mut ws_sink, mut ws_stream) = ws_stream.split();
 
     let session_update = build_session_update(&cfg);
-    diagnostic_log(session_id, "session_update_send");
     ws_sink
         .send(Message::Text(session_update.into()))
         .await
         .map_err(|e| sanitize_error(&cfg, format!("send session.update: {e}")))?;
-    diagnostic_log(session_id, "session_update_sent");
+    log.log("session_update_sent");
 
     let mut stream = Stream::default();
     let mut ready = false;
@@ -146,7 +126,7 @@ async fn run_session(
             biased;
 
             _ = stop_rx.recv() => {
-                diagnostic_log(session_id, "stop_requested");
+                log.log("stop_requested");
                 let finish = serde_json::json!({
                     "event_id": format!("event_finish_{}", rand::random::<u64>()),
                     "type": "session.finish",
@@ -195,61 +175,40 @@ async fn run_session(
             msg = ws_stream.next() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
+                        // Before `session.updated`, every event is a clue to why a session
+                        // never became ready.
                         if !ready {
-                            diagnostic_log(
-                                session_id,
-                                format!(
-                                    "server_event type={}",
-                                    diagnostic_field(
-                                        server_event_type(&text).as_deref().unwrap_or("invalid_json")
-                                    )
-                                ),
-                            );
+                            let kind = server_event_type(&text);
+                            log.log(format!(
+                                "server_event type={}",
+                                field(kind.as_deref().unwrap_or("invalid_json"))
+                            ));
                         }
                         if let Some(error) = server_error(&text) {
                             return Err(sanitize_error(&cfg, error));
                         }
                         if !ready && server_event_type(&text).as_deref() == Some("session.updated") {
                             ready = true;
-                            diagnostic_log(session_id, "ready");
                             events.emit(Event::Ready);
                         }
                         handle_server_event(&text, &events, &mut stream);
                     }
                     Some(Ok(Message::Binary(_))) => {}
                     Some(Ok(Message::Close(frame))) => {
-                        let reason = frame
-                            .map(|f| format!("{}: {}", f.code, f.reason))
-                            .unwrap_or_else(|| "connection_closed".into());
-                        diagnostic_log(
-                            session_id,
-                            format!("connection_closed reason={}", diagnostic_field(&reason)),
-                        );
-                        events.emit(Event::Closed(reason));
+                        events.emit(Event::Closed(close_reason(frame)));
                         break;
                     }
                     Some(Ok(_)) => {}
                     Some(Err(e)) => {
                         return Err(sanitize_error(&cfg, format!("ws error: {e}")));
                     }
-                    None => {
-                        diagnostic_log(session_id, "stream_ended");
-                        break;
-                    }
+                    None => break,
                 }
             }
         }
     }
 
     Ok(())
-}
-
-fn diagnostic_log(session_id: u64, message: impl AsRef<str>) {
-    crate::diagnostics::log(&format!("qwen:{session_id}"), message);
-}
-
-fn diagnostic_field(value: &str) -> String {
-    crate::diagnostics::field(value).chars().take(80).collect()
 }
 
 fn sanitize_error(cfg: &QwenRealtimeConfig, message: impl Into<String>) -> String {
@@ -483,7 +442,6 @@ mod tests {
             }
             .into(),
             protocol,
-            route_id: "system".into(),
         }
     }
 

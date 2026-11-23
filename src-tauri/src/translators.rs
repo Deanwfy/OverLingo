@@ -13,7 +13,6 @@ use std::sync::LazyLock;
 struct StartRequest<'a> {
     config: &'a AppConfig,
     route: &'a RouteConfig,
-    route_id: &'a str,
     api_key: &'a str,
     /// The catalog's protocol tag for the route's model; only the provider reads it.
     protocol: Option<&'a str>,
@@ -72,7 +71,6 @@ const ENGINES: &[Engine] = &[
                     workspace_id: request.config.qwen.workspace_id.clone(),
                     model: request.route.model.clone(),
                     protocol: qwen_realtime::Protocol::parse(request.protocol)?,
-                    route_id: request.route_id.into(),
                 },
                 events,
                 state,
@@ -278,7 +276,6 @@ pub(crate) fn route_config_error(
 pub(crate) fn open_session(
     config: &AppConfig,
     route: &RouteConfig,
-    route_id: &str,
     credentials: &CredentialStore,
     events: Events,
     state: &ProviderState,
@@ -293,7 +290,6 @@ pub(crate) fn open_session(
     let request = StartRequest {
         config,
         route,
-        route_id,
         api_key: credentials.get(&route.engine),
         protocol,
     };

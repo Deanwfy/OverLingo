@@ -1,12 +1,15 @@
-use super::{connect_error, Connection, Event, Events, FragmentKind, Joined, ProviderState};
+use super::{
+    close_reason, dial, Connection, Event, Events, FragmentKind, Joined, ProviderState, SessionLog,
+};
 use crate::audio::resampler::UpsamplerTo24k;
+use crate::diagnostics::field;
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures_util::{SinkExt, StreamExt};
 use http::Request;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::tungstenite::Message;
 
 const OPENAI_REALTIME_URL: &str = "wss://api.openai.com/v1/realtime/translations";
 
@@ -89,22 +92,26 @@ pub fn start_session(
     let (audio_tx, audio_rx) = mpsc::unbounded_channel::<Vec<u8>>();
     let (stop_tx, stop_rx) = mpsc::unbounded_channel::<()>();
 
+    let details = format!(
+        "model={} target={}",
+        field(&config.model),
+        field(&config.target_language),
+    );
     Ok(state.start(
+        "openai",
+        details,
         Session {
             audio_tx,
             stop_tx,
             upsampler,
         },
-        move |_| async move {
-            if let Err(error) = run_session(config, audio_rx, stop_rx, events.clone()).await {
-                events.emit(Event::Error(error));
-            }
-            events.emit(Event::Closed("session_ended".into()));
-        },
+        events,
+        move |log, events| run_session(log, config, audio_rx, stop_rx, events),
     ))
 }
 
 async fn run_session(
+    log: SessionLog,
     cfg: OpenAiRealtimeConfig,
     mut audio_rx: mpsc::UnboundedReceiver<Vec<u8>>,
     mut stop_rx: mpsc::UnboundedReceiver<()>,
@@ -124,15 +131,11 @@ async fn run_session(
         .body(())
         .map_err(|e| sanitize_error(&cfg, format!("build request: {e}")))?;
 
-    let connect = tokio::time::timeout(Duration::from_secs(14), connect_async(request));
-    tokio::pin!(connect);
-    let (ws_stream, _) = tokio::select! {
-        result = &mut connect => {
-            result
-                .map_err(|_| "websocket handshake timed out".to_string())?
-                .map_err(|e| sanitize_error(&cfg, connect_error(&e)))?
-        }
-        _ = stop_rx.recv() => return Ok(()),
+    let Some(ws_stream) = dial(&log, request, &mut stop_rx)
+        .await
+        .map_err(|error| sanitize_error(&cfg, error))?
+    else {
+        return Ok(());
     };
 
     let (mut ws_sink, mut ws_stream) = ws_stream.split();
@@ -154,6 +157,7 @@ async fn run_session(
             biased;
 
             _ = stop_rx.recv() => {
+                log.log("stop_requested");
                 segments.commit(&events);
                 let _ = ws_sink.send(Message::Close(None)).await;
                 break;
@@ -177,11 +181,8 @@ async fn run_session(
                     }
                     Some(Ok(Message::Binary(_))) => {}
                     Some(Ok(Message::Close(frame))) => {
-                        let reason = frame
-                            .map(|f| format!("{}: {}", f.code, f.reason))
-                            .unwrap_or_else(|| "connection_closed".into());
                         segments.commit(&events);
-                        events.emit(Event::Closed(reason));
+                        events.emit(Event::Closed(close_reason(frame)));
                         break;
                     }
                     Some(Ok(_)) => {}

@@ -171,7 +171,7 @@ impl ControllerActor {
 
         let sender = self.sender.clone();
         let route_key = route_id.to_string();
-        let started = provider::start(&self.app, &self.config, route_id, &config, move |event| {
+        let started = provider::start(&self.app, &self.config, &config, move |event| {
             let _ = sender.send(Action::Provider {
                 route_id: route_key.clone(),
                 token,
@@ -181,10 +181,11 @@ impl ControllerActor {
 
         match started {
             Ok(handle) => {
+                // `handle` is the number in the provider's own scope, e.g. `soniox:3`.
                 diagnostics::log(
                     "route",
                     format!(
-                        "provider_dialling route={route_id} engine={}",
+                        "provider_dialling route={route_id} engine={} token={token} handle={handle}",
                         diagnostics::field(&config.engine)
                     ),
                 );
@@ -222,7 +223,29 @@ impl ControllerActor {
         };
         // A token that owns neither slot belongs to a session already replaced or torn down.
         let pending = route.owns_pending(token);
-        if !route.owns(token) && !pending {
+        let live = route.owns(token);
+        let outcome = match &event {
+            ProviderEvent::Fragment { .. } => None,
+            ProviderEvent::Ready => Some("ready".to_string()),
+            ProviderEvent::Error(message) => Some(format!("error {}", diagnostics::field(message))),
+            ProviderEvent::Closed(message) => {
+                Some(format!("closed {}", diagnostics::field(message)))
+            }
+        };
+        if let Some(outcome) = outcome {
+            let slot = if live {
+                "live"
+            } else if pending {
+                "pending"
+            } else {
+                "stale"
+            };
+            diagnostics::log(
+                "route",
+                format!("provider_event route={route_id} token={token} slot={slot} {outcome}"),
+            );
+        }
+        if !live && !pending {
             return;
         }
         match event {
@@ -253,7 +276,6 @@ impl ControllerActor {
         session.ready = true;
         let handle = session.handle;
         route.error.clear();
-        diagnostics::log("route", format!("provider_ready route={route_id}"));
         route.bridge.attach(&self.app, handle);
         self.refresh_route_state(route_id);
         self.sync_translation_state();

@@ -5,6 +5,58 @@ pub mod soniox_realtime;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+
+pub type Socket =
+    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
+
+/// Diagnostics for one provider session, under a scope such as `soniox:3` whose number is
+/// the handle the controller logs when it dials.
+#[derive(Clone)]
+pub struct SessionLog(String);
+
+impl SessionLog {
+    pub fn log(&self, message: impl AsRef<str>) {
+        crate::diagnostics::log(&self.0, message);
+    }
+}
+
+/// Why the server closed the socket, as the controller reports it.
+pub fn close_reason(frame: Option<tokio_tungstenite::tungstenite::protocol::CloseFrame>) -> String {
+    frame.map_or_else(
+        || "connection_closed".into(),
+        |frame| format!("{}: {}", frame.code, frame.reason),
+    )
+}
+
+/// Opens a provider's websocket, or returns `None` when the session is stopped first. The
+/// error is the transport's or the server's own; callers redact their secrets from it.
+pub async fn dial(
+    log: &SessionLog,
+    request: impl IntoClientRequest + Unpin,
+    stop_rx: &mut mpsc::UnboundedReceiver<()>,
+) -> Result<Option<Socket>, String> {
+    log.log("websocket_handshake_start");
+    let connect = tokio::time::timeout(
+        Duration::from_secs(14),
+        tokio_tungstenite::connect_async(request),
+    );
+    tokio::select! {
+        result = connect => {
+            let (socket, response) = result
+                .map_err(|_| "websocket handshake timed out".to_string())?
+                .map_err(|error| connect_error(&error))?;
+            log.log(format!("websocket_handshake_ok status={}", response.status()));
+            Ok(Some(socket))
+        }
+        _ = stop_rx.recv() => {
+            log.log("websocket_handshake_cancelled");
+            Ok(None)
+        }
+    }
+}
 
 /// What every translator reports, whatever its wire protocol. Providers speak this so the
 /// controller never has to know which one it is reading.
@@ -144,13 +196,18 @@ pub struct ProviderState {
 }
 
 impl ProviderState {
+    /// Runs one session: `details` opens its log, and however `run` ends, the controller
+    /// hears `Closed` last, preceded by the error if there was one.
     pub fn start<F>(
         &self,
+        provider: &'static str,
+        details: String,
         connection: impl Connection + 'static,
-        run: impl FnOnce(u64) -> F + Send + 'static,
+        events: Events,
+        run: impl FnOnce(SessionLog, Events) -> F + Send + 'static,
     ) -> u64
     where
-        F: Future<Output = ()> + Send,
+        F: Future<Output = Result<(), String>> + Send,
     {
         let id = {
             let mut next = self.next_id.lock().unwrap();
@@ -163,7 +220,17 @@ impl ProviderState {
             .insert(id, Box::new(connection));
         let connections = self.connections.clone();
         tokio::spawn(async move {
-            run(id).await;
+            let log = SessionLog(format!("{provider}:{id}"));
+            log.log(format!("start {details}"));
+            if let Err(error) = run(log.clone(), events.clone()).await {
+                log.log(format!(
+                    "failed error={}",
+                    crate::diagnostics::field(&error)
+                ));
+                events.emit(Event::Error(error));
+            }
+            events.emit(Event::Closed("session_ended".into()));
+            log.log("ended");
             if let Ok(mut open) = connections.lock() {
                 open.remove(&id);
             }

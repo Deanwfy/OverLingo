@@ -1,8 +1,10 @@
-use super::{connect_error, Connection, Event, Events, FragmentKind, ProviderState};
+use super::{
+    close_reason, dial, Connection, Event, Events, FragmentKind, ProviderState, SessionLog,
+};
+use crate::diagnostics::field;
 use futures_util::{SinkExt, StreamExt};
-use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::tungstenite::Message;
 
 const SONIOX_REALTIME_URL: &str = "wss://stt-rt.soniox.com/transcribe-websocket";
 /// Soniox marks the end of an utterance with this token rather than a message flag.
@@ -39,34 +41,33 @@ pub fn start_session(
 ) -> Result<u64, String> {
     let (audio_tx, audio_rx) = mpsc::unbounded_channel::<Vec<u8>>();
     let (stop_tx, stop_rx) = mpsc::unbounded_channel::<()>();
-
-    let id = state.start(Session { audio_tx, stop_tx }, move |_| async move {
-        if let Err(error) = run_session(config, audio_rx, stop_rx, events.clone()).await {
-            events.emit(Event::Error(error));
-        }
-        events.emit(Event::Closed("session_ended".into()));
-    });
-    Ok(id)
+    let details = format!(
+        "model={} source={} target={}",
+        field(&config.model),
+        field(&config.source_language),
+        field(&config.target_language),
+    );
+    Ok(state.start(
+        "soniox",
+        details,
+        Session { audio_tx, stop_tx },
+        events,
+        move |log, events| run_session(log, config, audio_rx, stop_rx, events),
+    ))
 }
 
 async fn run_session(
+    log: SessionLog,
     cfg: SonioxRealtimeConfig,
     mut audio_rx: mpsc::UnboundedReceiver<Vec<u8>>,
     mut stop_rx: mpsc::UnboundedReceiver<()>,
     events: Events,
 ) -> Result<(), String> {
-    let connect = tokio::time::timeout(
-        Duration::from_secs(14),
-        connect_async(SONIOX_REALTIME_URL.to_string()),
-    );
-    tokio::pin!(connect);
-    let (ws_stream, _) = tokio::select! {
-        result = &mut connect => {
-            result
-                .map_err(|_| "websocket handshake timed out".to_string())?
-                .map_err(|error| sanitize_error(&cfg, connect_error(&error)))?
-        }
-        _ = stop_rx.recv() => return Ok(()),
+    let Some(ws_stream) = dial(&log, SONIOX_REALTIME_URL, &mut stop_rx)
+        .await
+        .map_err(|error| sanitize_error(&cfg, error))?
+    else {
+        return Ok(());
     };
 
     let (mut ws_sink, mut ws_stream) = ws_stream.split();
@@ -85,6 +86,7 @@ async fn run_session(
             biased;
 
             _ = stop_rx.recv() => {
+                log.log("stop_requested");
                 // An empty frame tells Soniox no more audio is coming, so the tail of the
                 // last utterance is still transcribed instead of being cut off.
                 let _ = ws_sink.send(Message::Binary(Vec::new().into())).await;
@@ -106,10 +108,7 @@ async fn run_session(
                         }
                     }
                     Some(Ok(Message::Close(frame))) => {
-                        let reason = frame
-                            .map(|frame| format!("{}: {}", frame.code, frame.reason))
-                            .unwrap_or_else(|| "connection_closed".into());
-                        events.emit(Event::Closed(reason));
+                        events.emit(Event::Closed(close_reason(frame)));
                         break;
                     }
                     Some(Ok(_)) => {}
