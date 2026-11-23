@@ -2,7 +2,7 @@
     import type { ControllerSnapshot, OverlayAction, RouteConfig, RouteId } from '../app/types';
     import { t } from '../core/locale.svelte';
     import { LANGUAGES, languageName } from '../core/languages.js';
-    import { supportsLanguage, translator, translators } from '../core/translators.js';
+    import { accepts, supportsPair, translator, translators } from '../core/translators.js';
     import Icon from './Icon.svelte';
 
     let { routeId, state, send, starting, enabledCount }: {
@@ -33,29 +33,26 @@
     function translatorOptions(route: RouteConfig) {
         return configured.map(entry => ({
             id: entry.id,
-            name: entry.name + (supportsPair(entry.id, route) ? '' : ` · ${t('unsupportedLanguages')}`),
+            name: entry.name
+                + (supportsPair(entry.id, route.sourceLanguage, route.targetLanguage)
+                    ? ''
+                    : ` · ${t('unsupportedLanguages')}`),
         }));
-    }
-
-    function supportsPair(model: string, route: RouteConfig) {
-        return supportsLanguage(model, route.sourceLanguage)
-            && supportsLanguage(model, route.targetLanguage);
     }
 
     // Filtered to what the translator accepts, except for the value the route already
     // holds: switching translator must not blank the select, and seeing the offending
     // language is how the user knows what to fix. Reachability is preserved by the
     // translator picker, which is never restricted — switch first, then fix the language.
-    function languageOptions(route: RouteConfig, current: string) {
+    function languageOptions(route: RouteConfig, field: 'source' | 'target') {
+        const current = field === 'source' ? route.sourceLanguage : route.targetLanguage;
         return LANGUAGES
-            .filter(language => language.code === current
-                || supportsLanguage(route.model, language.code))
-            .map(language => ({
-                code: language.code,
-                name: languageName(language.code, state.locale)
-                    + (supportsLanguage(route.model, language.code)
-                        ? ''
-                        : ` · ${t('unsupportedByTranslator')}`),
+            .map(code => ({ code, accepted: accepts(route.model, field, code) }))
+            .filter(({ code, accepted }) => accepted || code === current)
+            .map(({ code, accepted }) => ({
+                code,
+                name: languageName(code, state.locale)
+                    + (accepted ? '' : ` · ${t('unsupportedByTranslator')}`),
             }))
             .sort((left, right) => left.name.localeCompare(right.name, state.locale));
     }
@@ -167,7 +164,7 @@
                 disabled={!route.enabled || starting}
                 onchange={(event) => updateLanguage('sourceLanguage', event.currentTarget.value)}
             >
-                {#each languageOptions(route, route.sourceLanguage) as language}
+                {#each languageOptions(route, 'source') as language}
                     <option value={language.code}>{language.name}</option>
                 {/each}
             </select>
@@ -187,7 +184,7 @@
                 disabled={!route.enabled || starting}
                 onchange={(event) => updateLanguage('targetLanguage', event.currentTarget.value)}
             >
-                {#each languageOptions(route, route.targetLanguage) as language}
+                {#each languageOptions(route, 'target') as language}
                     <option value={language.code}>{language.name}</option>
                 {/each}
             </select>

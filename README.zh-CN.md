@@ -57,7 +57,7 @@
 
 ## 支持的服务商
 
-- 阿里云百炼：[Qwen3.5 LiveTranslate Flash Realtime](https://help.aliyun.com/zh/model-studio/qwen3-5-livetranslate-flash-realtime)
+- 阿里云百炼：[Qwen3.8 LiveTranslate Flash Realtime](https://help.aliyun.com/zh/model-studio/qwen3-8-livetranslate-flash-realtime)、[Qwen3.5 LiveTranslate Flash Realtime](https://help.aliyun.com/zh/model-studio/qwen3-5-livetranslate-flash-realtime)
 - OpenAI：[GPT Realtime Translate](https://developers.openai.com/api/docs/guides/realtime-translation)
 - Soniox：[Real-time STT v6](https://soniox.com/docs/translation/stt-translation/rt-translation)
 

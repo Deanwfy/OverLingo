@@ -133,6 +133,15 @@ fn sanitize_error(cfg: &SonioxRealtimeConfig, message: String) -> String {
     }
 }
 
+/// Soniox spells two languages with their older codes.
+fn soniox_code(code: &str) -> &str {
+    match code {
+        "nb" => "no",
+        "fil" => "tl",
+        other => other,
+    }
+}
+
 fn build_config(cfg: &SonioxRealtimeConfig) -> String {
     serde_json::json!({
         "api_key": cfg.api_key,
@@ -140,11 +149,11 @@ fn build_config(cfg: &SonioxRealtimeConfig) -> String {
         "audio_format": "pcm_s16le",
         "sample_rate": 16_000,
         "num_channels": 1,
-        "language_hints": [cfg.source_language],
+        "language_hints": [soniox_code(&cfg.source_language)],
         "enable_endpoint_detection": true,
         "translation": {
             "type": "one_way",
-            "target_language": cfg.target_language,
+            "target_language": soniox_code(&cfg.target_language),
         },
     })
     .to_string()
@@ -268,35 +277,7 @@ fn server_error(value: &serde_json::Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
-
-    /// (stream, snapshot, final) triples, in the order the provider emitted them.
-    type Emitted = Arc<Mutex<Vec<(String, String, bool)>>>;
-
-    fn collector() -> (Events, Emitted) {
-        let collected: Emitted = Arc::new(Mutex::new(Vec::new()));
-        let events = Events::callback({
-            let collected = collected.clone();
-            move |event| {
-                if let Event::Fragment {
-                    kind,
-                    text,
-                    final_fragment,
-                } = event
-                {
-                    let kind = match kind {
-                        FragmentKind::Original => "original",
-                        FragmentKind::Translation => "translation",
-                    };
-                    collected
-                        .lock()
-                        .unwrap()
-                        .push((kind.into(), text, final_fragment));
-                }
-            }
-        });
-        (events, collected)
-    }
+    use crate::providers::collector;
 
     #[test]
     fn config_requests_both_directions_as_raw_pcm() {
@@ -313,6 +294,19 @@ mod tests {
         assert_eq!(value["language_hints"][0], "en");
         assert_eq!(value["translation"]["target_language"], "zh");
         assert_eq!(value["enable_endpoint_detection"], true);
+    }
+
+    #[test]
+    fn languages_go_out_in_soniox_spelling() {
+        let config = SonioxRealtimeConfig {
+            api_key: "test".into(),
+            model: "stt-rt-v6".into(),
+            source_language: "nb".into(),
+            target_language: "fil".into(),
+        };
+        let value: serde_json::Value = serde_json::from_str(&build_config(&config)).unwrap();
+        assert_eq!(value["language_hints"][0], "no");
+        assert_eq!(value["translation"]["target_language"], "tl");
     }
 
     /// Non-final tokens are resent every message, so they must replace rather than append.
@@ -335,8 +329,8 @@ mod tests {
         assert_eq!(
             *collected.lock().unwrap(),
             vec![
-                ("original".into(), "He".into(), false),
-                ("original".into(), "Hello".into(), false),
+                ("original", "He".into(), false),
+                ("original", "Hello".into(), false),
             ]
         );
     }
@@ -365,9 +359,9 @@ mod tests {
         assert_eq!(
             *collected.lock().unwrap(),
             vec![
-                ("original".into(), "Hello".into(), true),
-                ("translation".into(), "你好".into(), true),
-                ("original".into(), "Bye".into(), false),
+                ("original", "Hello".into(), true),
+                ("translation", "你好".into(), true),
+                ("original", "Bye".into(), false),
             ]
         );
     }

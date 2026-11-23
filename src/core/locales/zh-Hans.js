@@ -90,7 +90,7 @@ export default {
     captureApplicationSilent: '应用无音频',
     microphoneUnavailable: '麦克风不可用，请检查权限和输入设备。',
     networkUnavailable: '无法连接翻译器，请检查网络后再试。',
-    workspaceRequired: 'Qwen 3.5 需要填写 Workspace ID。',
+    workspaceRequired: 'Qwen 需要填写 Workspace ID。',
     chooseAudioSource: '请至少启用一个音频来源。',
     invalidLanguagePair: '请选择两种不同的语言。',
     autoCheckUpdates: '自动检查更新',

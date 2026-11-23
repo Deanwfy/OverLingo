@@ -1,0 +1,21 @@
+[
+    {
+        "about": "each end is held to its own set",
+        "languages": { "source": ["en", "nl"], "target": ["en"] },
+        "cases": [["nl", "en", true], ["en", "nl", false]]
+    },
+    {
+        "about": "an open end takes any code",
+        "languages": { "source": null, "target": ["en"] },
+        "cases": [["tlh", "en", true], ["tlh", "ja", false]]
+    },
+    {
+        "about": "a pivot provider pairs English with each other language, never two others",
+        "languages": {
+            "source": ["en", "ja", "zh"],
+            "target": ["en", "ja", "zh"],
+            "pairs": { "en": ["ja", "zh"], "ja": ["en"], "zh": ["en"] }
+        },
+        "cases": [["ja", "en", true], ["en", "zh", true], ["ja", "zh", false]]
+    }
+]

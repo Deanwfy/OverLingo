@@ -90,7 +90,7 @@ export default {
     captureApplicationSilent: 'アプリに音声なし',
     microphoneUnavailable: 'マイクを使用できません。権限と入力デバイスを確認してください。',
     networkUnavailable: '翻訳サービスに接続できません。ネットワークを確認して再試行してください。',
-    workspaceRequired: 'Qwen 3.5にはWorkspace IDが必要です。',
+    workspaceRequired: 'QwenにはWorkspace IDが必要です。',
     chooseAudioSource: '音声を1つ以上オンにしてください。',
     invalidLanguagePair: '異なる2つの言語を選択してください。',
     autoCheckUpdates: 'アップデートを自動的に確認',

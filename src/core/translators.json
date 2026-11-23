@@ -1,25 +1,56 @@
-[
-    {
-        "id": "qwen3.5-livetranslate-flash-realtime",
-        "provider": "qwen",
-        "name": "Qwen3.5 LiveTranslate Flash Realtime",
-        "languages": null
-    },
-    {
-        "id": "stt-rt-v6",
-        "provider": "soniox",
-        "name": "Soniox Real-time STT v6",
-        "languages": [
+{
+    "languageSets": {
+        "alibaba": [
+            "af", "ar", "ast", "az", "be", "bg", "bn", "bs", "ca", "ceb", "cs", "da", "de", "el", "en", "es",
+            "et", "fa", "fi", "fil", "fr", "gl", "gu", "he", "hi", "hr", "hu", "id", "is", "it", "ja", "jv",
+            "kk", "kn", "ko", "ky", "lv", "mk", "ml", "mr", "ms", "nb", "nl", "pa", "pl", "pt", "ro", "ru",
+            "sk", "sl", "sv", "sw", "tg", "th", "tr", "uk", "ur", "vi", "yue", "zh"
+        ],
+        "soniox": [
             "af", "ar", "az", "be", "bg", "bn", "bs", "ca", "cs", "cy", "da", "de", "el", "en", "es", "et",
-            "eu", "fa", "fi", "fr", "gl", "gu", "he", "hi", "hr", "hu", "id", "it", "ja", "kk", "kn", "ko",
-            "lt", "lv", "mk", "ml", "mr", "ms", "nl", "no", "pa", "pl", "pt", "ro", "ru", "sk", "sl", "sq",
-            "sr", "sv", "sw", "ta", "te", "th", "tl", "tr", "uk", "ur", "vi", "zh"
+            "eu", "fa", "fi", "fil", "fr", "gl", "gu", "he", "hi", "hr", "hu", "id", "it", "ja", "kk", "kn",
+            "ko", "lt", "lv", "mk", "ml", "mr", "ms", "nb", "nl", "pa", "pl", "pt", "ro", "ru", "sk", "sl",
+            "sq", "sr", "sv", "sw", "ta", "te", "th", "tr", "uk", "ur", "vi", "zh"
         ]
     },
-    {
-        "id": "gpt-realtime-translate",
-        "provider": "openai",
-        "name": "GPT Realtime Translate",
-        "languages": ["zh", "en", "fr", "de", "hi", "id", "it", "ja", "ko", "pt", "ru", "es", "vi"]
-    }
-]
+    "models": [
+        {
+            "id": "qwen3.8-livetranslate-flash-realtime",
+            "provider": "qwen",
+            "name": "Qwen3.8 LiveTranslate Flash Realtime",
+            "protocol": "qwen-livetranslate-3.8",
+            "default": true,
+            "languages": { "source": "alibaba", "target": "alibaba" }
+        },
+        {
+            "id": "qwen3.5-livetranslate-flash-realtime",
+            "provider": "qwen",
+            "name": "Qwen3.5 LiveTranslate Flash Realtime",
+            "protocol": "qwen-livetranslate-3.5",
+            "languages": { "source": "alibaba", "target": "alibaba" }
+        },
+        {
+            "id": "stt-rt-v6",
+            "provider": "soniox",
+            "name": "Soniox Real-time STT v6",
+            "default": true,
+            "languages": { "source": "soniox", "target": "soniox" }
+        },
+        {
+            "id": "gpt-realtime-translate",
+            "provider": "openai",
+            "name": "GPT Realtime Translate",
+            "default": true,
+            "languages": {
+                "source": [
+                    "af", "ar", "az", "be", "bg", "bn", "bs", "ca", "cs", "cy", "da", "de", "dz", "el", "en", "eo",
+                    "es", "et", "eu", "fa", "fi", "fil", "fr", "gl", "gu", "haw", "he", "hi", "hr", "ht", "hu", "hy",
+                    "id", "it", "ja", "jv", "ka", "kk", "ko", "ku", "la", "lt", "lv", "mi", "mk", "ml", "mn", "ms",
+                    "my", "nb", "ne", "nl", "nn", "pa", "pl", "pt", "ro", "ru", "sk", "sl", "sn", "sq", "sr", "sv",
+                    "sw", "te", "th", "tr", "uk", "uz", "vi", "yo", "zh"
+                ],
+                "target": ["zh", "en", "fr", "de", "hi", "id", "it", "ja", "ko", "pt", "ru", "es", "vi"]
+            }
+        }
+    ]
+}

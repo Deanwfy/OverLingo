@@ -90,7 +90,7 @@ export default {
     captureApplicationSilent: 'App has no audio',
     microphoneUnavailable: 'The microphone is unavailable. Check its permission and input device.',
     networkUnavailable: 'Could not connect to the translator. Check your network and try again.',
-    workspaceRequired: 'Qwen 3.5 requires a Workspace ID.',
+    workspaceRequired: 'Qwen requires a Workspace ID.',
     chooseAudioSource: 'Turn on at least one audio source.',
     invalidLanguagePair: 'Choose two different languages.',
     autoCheckUpdates: 'Check for updates automatically',

@@ -1,4 +1,4 @@
-use super::{connect_error, Connection, Event, Events, FragmentKind, ProviderState};
+use super::{connect_error, Connection, Event, Events, FragmentKind, Joined, ProviderState};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures_util::{SinkExt, StreamExt};
 use http::Request;
@@ -6,7 +6,26 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
-const CURRENT_MODEL: &str = "qwen3.5-livetranslate-flash-realtime";
+/// LiveTranslate's session setup and its streaming events change between model versions,
+/// so the catalog names the version each model speaks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Protocol {
+    LiveTranslate35,
+    LiveTranslate38,
+}
+
+impl Protocol {
+    pub fn parse(tag: Option<&str>) -> Result<Self, String> {
+        match tag {
+            Some("qwen-livetranslate-3.5") => Ok(Self::LiveTranslate35),
+            Some("qwen-livetranslate-3.8") => Ok(Self::LiveTranslate38),
+            other => Err(format!(
+                "Unsupported Qwen LiveTranslate protocol: {}",
+                other.unwrap_or("none")
+            )),
+        }
+    }
+}
 
 pub struct QwenRealtimeConfig {
     pub api_key: String,
@@ -15,6 +34,7 @@ pub struct QwenRealtimeConfig {
     pub region: String,
     pub workspace_id: String,
     pub model: String,
+    pub protocol: Protocol,
     pub route_id: String,
 }
 
@@ -118,7 +138,7 @@ async fn run_session(
         .map_err(|e| sanitize_error(&cfg, format!("send session.update: {e}")))?;
     diagnostic_log(session_id, "session_update_sent");
 
-    let mut last_done_response_id: Option<String> = None;
+    let mut stream = Stream::default();
     let mut ready = false;
 
     loop {
@@ -146,11 +166,7 @@ async fn run_session(
                         let remaining = deadline.saturating_duration_since(now);
                         match tokio::time::timeout(remaining, ws_stream.next()).await {
                             Ok(Some(Ok(Message::Text(text)))) => {
-                                if handle_server_event(
-                                    &text,
-                                    &events,
-                                    &mut last_done_response_id,
-                                ) {
+                                if handle_server_event(&text, &events, &mut stream) {
                                     break;
                                 }
                             }
@@ -198,7 +214,7 @@ async fn run_session(
                             diagnostic_log(session_id, "ready");
                             events.emit(Event::Ready);
                         }
-                        handle_server_event(&text, &events, &mut last_done_response_id);
+                        handle_server_event(&text, &events, &mut stream);
                     }
                     Some(Ok(Message::Binary(_))) => {}
                     Some(Ok(Message::Close(frame))) => {
@@ -248,13 +264,9 @@ fn sanitize_error(cfg: &QwenRealtimeConfig, message: impl Into<String>) -> Strin
 
 fn build_qwen_endpoint(cfg: &QwenRealtimeConfig) -> Result<(String, String), String> {
     let model = cfg.model.trim();
-    if model != CURRENT_MODEL {
-        return Err(format!("Unsupported Qwen LiveTranslate model: {}", model));
-    }
-
     let workspace_id = cfg.workspace_id.trim();
     if workspace_id.is_empty() {
-        return Err("Qwen3.5 requires a Model Studio Workspace ID".into());
+        return Err("Qwen LiveTranslate requires a Model Studio Workspace ID".into());
     }
     if !workspace_id
         .chars()
@@ -273,29 +285,42 @@ fn build_qwen_endpoint(cfg: &QwenRealtimeConfig) -> Result<(String, String), Str
 }
 
 fn build_session_update(cfg: &QwenRealtimeConfig) -> String {
-    let source = if cfg.source_language.is_empty() || cfg.source_language == "auto" {
-        "en"
-    } else {
-        cfg.source_language.as_str()
+    let session = match cfg.protocol {
+        Protocol::LiveTranslate35 => {
+            let source = if cfg.source_language.is_empty() || cfg.source_language == "auto" {
+                "en"
+            } else {
+                cfg.source_language.as_str()
+            };
+            serde_json::json!({
+                "modalities": ["text"],
+                "sample_rate": 16000,
+                "input_audio_format": "pcm",
+                "input_audio_transcription": {
+                    "language": source,
+                    "model": "qwen3-asr-flash-realtime",
+                },
+                "translation": { "language": cfg.target_language },
+                "turn_detection": {
+                    "type": "server_vad",
+                    "threshold": 0.2,
+                    "silence_duration_ms": 800,
+                },
+            })
+        }
+        // 3.8 always transcribes and detects the source language itself, so it has no
+        // field for either. Turn detection stays on its default, speaker detection: server
+        // VAD stalled on audio that never falls silent (a podcast over music).
+        Protocol::LiveTranslate38 => serde_json::json!({
+            "output_modalities": ["text"],
+            "audio": {
+                "input": {
+                    "format": { "type": "pcm", "sample_rate": 16000 },
+                },
+            },
+            "translation": { "language": cfg.target_language },
+        }),
     };
-
-    let input_audio_transcription = serde_json::json!({
-        "language": source,
-        "model": "qwen3-asr-flash-realtime",
-    });
-
-    let session = serde_json::json!({
-        "modalities": ["text"],
-        "sample_rate": 16000,
-        "input_audio_format": "pcm",
-        "input_audio_transcription": input_audio_transcription,
-        "translation": { "language": cfg.target_language },
-        "turn_detection": {
-            "type": "server_vad",
-            "threshold": 0.2,
-            "silence_duration_ms": 800,
-        },
-    });
 
     serde_json::json!({
         "event_id": format!("event_session_{}", rand::random::<u64>()),
@@ -305,11 +330,14 @@ fn build_session_update(cfg: &QwenRealtimeConfig) -> String {
     .to_string()
 }
 
-fn handle_server_event(
-    text: &str,
-    events: &Events,
-    last_done_response_id: &mut Option<String>,
-) -> bool {
+/// 3.5 resends whole snapshots; 3.8 streams deltas, which only it fills `joined` with.
+#[derive(Default)]
+struct Stream {
+    last_done_response_id: Option<String>,
+    joined: Joined,
+}
+
+fn handle_server_event(text: &str, events: &Events, stream: &mut Stream) -> bool {
     let value: serde_json::Value = match serde_json::from_str(text) {
         Ok(v) => v,
         Err(_) => return false,
@@ -321,8 +349,23 @@ fn handle_server_event(
     };
 
     match evt_type {
-        "session.created" | "session.updated" | "response.created" | "response.done" => {}
+        "session.created" | "session.updated" | "response.created" => {}
         "session.finished" => return true,
+
+        // 3.8 does not promise a `response.text.done`; whatever is still open is final here.
+        "response.done" => stream.joined.finish(FragmentKind::Translation, events),
+
+        "response.text.delta" => {
+            if let Some(delta) = value.get("delta").and_then(|v| v.as_str()) {
+                stream.joined.push(FragmentKind::Translation, delta, events);
+            }
+        }
+
+        "conversation.item.input_audio_transcription.delta" => {
+            if let Some(delta) = value.get("delta").and_then(|v| v.as_str()) {
+                stream.joined.push(FragmentKind::Original, delta, events);
+            }
+        }
 
         "response.text.text" => {
             let text = partial_text(&value);
@@ -334,11 +377,12 @@ fn handle_server_event(
         "response.text.done" => {
             let response_id =
                 string_field(&value, "response_id").or_else(|| string_field(&value, "item_id"));
+            stream.joined.clear(FragmentKind::Translation);
             // The server can repeat a done event; emitting twice would duplicate the turn.
-            if response_id.is_some() && response_id == *last_done_response_id {
+            if response_id.is_some() && response_id == stream.last_done_response_id {
                 return false;
             }
-            *last_done_response_id = response_id;
+            stream.last_done_response_id = response_id;
 
             if let Some(text) = string_field(&value, "text") {
                 events.emit(Event::fragment(FragmentKind::Translation, text, true));
@@ -353,6 +397,7 @@ fn handle_server_event(
         }
 
         "conversation.item.input_audio_transcription.completed" => {
+            stream.joined.clear(FragmentKind::Original);
             if let Some(text) =
                 string_field(&value, "transcript").or_else(|| string_field(&value, "text"))
             {
@@ -423,67 +468,159 @@ fn string_field(value: &serde_json::Value, field: &str) -> Option<String> {
 mod tests {
     use super::*;
 
-    fn config(region: &str, workspace_id: &str, model: &str) -> QwenRealtimeConfig {
+    const QWEN35: &str = "qwen3.5-livetranslate-flash-realtime";
+
+    fn config(region: &str, workspace_id: &str, protocol: Protocol) -> QwenRealtimeConfig {
         QwenRealtimeConfig {
             api_key: "test-key".into(),
             source_language: "zh".into(),
             target_language: "en".into(),
             region: region.into(),
             workspace_id: workspace_id.into(),
-            model: model.into(),
+            model: match protocol {
+                Protocol::LiveTranslate35 => QWEN35,
+                Protocol::LiveTranslate38 => "qwen3.8-livetranslate-flash-realtime",
+            }
+            .into(),
+            protocol,
             route_id: "system".into(),
         }
     }
 
-    /// The wire protocol here is written for one model version, so a catalog bump has to
-    /// come with a look at this provider.
-    #[test]
-    fn speaks_the_catalog_model() {
-        assert_eq!(crate::translators::default_model("qwen"), CURRENT_MODEL);
+    fn session_update(protocol: Protocol) -> serde_json::Value {
+        serde_json::from_str(&build_session_update(&config("beijing", "ws", protocol))).unwrap()
     }
 
+    fn replay(events: &[serde_json::Value]) -> Vec<(&'static str, String, bool)> {
+        let (callback, collected) = crate::providers::collector();
+        let mut stream = Stream::default();
+        for event in events {
+            handle_server_event(&event.to_string(), &callback, &mut stream);
+        }
+        let fragments = collected.lock().unwrap().clone();
+        fragments
+    }
+
+    /// A model the code was not written for must fail before it dials.
     #[test]
-    fn rejects_retired_models() {
-        let cfg = config("beijing", "ws-123", "qwen3-livetranslate-flash-realtime");
-        assert!(build_qwen_endpoint(&cfg).is_err());
+    fn refuses_an_unknown_protocol() {
+        assert!(Protocol::parse(None).is_err());
+        assert!(Protocol::parse(Some("qwen-livetranslate-9")).is_err());
+        assert_eq!(
+            Protocol::parse(Some("qwen-livetranslate-3.8")),
+            Ok(Protocol::LiveTranslate38)
+        );
     }
 
     #[test]
     fn builds_workspace_beijing_endpoint() {
-        let cfg = config("beijing", "ws-123", CURRENT_MODEL);
+        let cfg = config("beijing", "ws-123", Protocol::LiveTranslate35);
         let (url, host) = build_qwen_endpoint(&cfg).unwrap();
         assert_eq!(host, "ws-123.cn-beijing.maas.aliyuncs.com");
         assert_eq!(
             url,
-            "wss://ws-123.cn-beijing.maas.aliyuncs.com/api-ws/v1/realtime?model=qwen3.5-livetranslate-flash-realtime"
+            format!("wss://ws-123.cn-beijing.maas.aliyuncs.com/api-ws/v1/realtime?model={QWEN35}")
         );
     }
 
     #[test]
-    fn qwen35_requires_workspace_id() {
-        let cfg = config("beijing", "", CURRENT_MODEL);
+    fn requires_workspace_id() {
+        let cfg = config("beijing", "", Protocol::LiveTranslate38);
         assert!(build_qwen_endpoint(&cfg).is_err());
     }
 
     #[test]
-    fn source_transcript_is_always_requested() {
-        let cfg = config("beijing", "ws-123", CURRENT_MODEL);
-        let enabled: serde_json::Value = serde_json::from_str(&build_session_update(&cfg)).unwrap();
+    fn qwen35_requests_the_source_transcript_and_server_vad() {
+        let update = session_update(Protocol::LiveTranslate35);
+        let session = &update["session"];
         assert_eq!(
-            enabled["session"]["input_audio_transcription"]["model"],
+            session["input_audio_transcription"]["model"],
             "qwen3-asr-flash-realtime"
+        );
+        assert_eq!(session["input_audio_transcription"]["language"], "zh");
+        assert_eq!(session["sample_rate"], 16000);
+        assert_eq!(session["turn_detection"]["type"], "server_vad");
+        assert!(update["event_id"]
+            .as_str()
+            .is_some_and(|value| value.starts_with("event_session_")));
+    }
+
+    /// 3.8 rejects or ignores 3.5's flat fields, so none of them may leak into its setup.
+    #[test]
+    fn qwen38_nests_audio_and_sends_no_source_language() {
+        let session = &session_update(Protocol::LiveTranslate38)["session"];
+        assert_eq!(session["output_modalities"], serde_json::json!(["text"]));
+        assert_eq!(session["audio"]["input"]["format"]["type"], "pcm");
+        assert_eq!(session["audio"]["input"]["format"]["sample_rate"], 16000);
+        assert!(session["audio"]["input"].get("turn_detection").is_none());
+        assert_eq!(session["translation"]["language"], "en");
+        for field in [
+            "modalities",
+            "sample_rate",
+            "input_audio_format",
+            "input_audio_transcription",
+            "turn_detection",
+        ] {
+            assert!(session.get(field).is_none(), "{field}");
+        }
+    }
+
+    #[test]
+    fn qwen38_deltas_become_whole_segments() {
+        let fragments = replay(&[
+            serde_json::json!({"type": "conversation.item.input_audio_transcription.delta", "delta": "你好"}),
+            serde_json::json!({"type": "conversation.item.input_audio_transcription.delta", "delta": "世界"}),
+            serde_json::json!({"type": "conversation.item.input_audio_transcription.completed", "transcript": "你好世界"}),
+            serde_json::json!({"type": "response.text.delta", "delta": "Hello"}),
+            serde_json::json!({"type": "response.text.delta", "delta": " world"}),
+            serde_json::json!({"type": "response.text.done", "response_id": "r1", "text": "Hello world"}),
+            serde_json::json!({"type": "response.done", "response": {"id": "r1"}}),
+            serde_json::json!({"type": "conversation.item.input_audio_transcription.delta", "delta": "再见"}),
+        ]);
+        let expected = [
+            ("original", "你好", false),
+            ("original", "你好世界", false),
+            ("original", "你好世界", true),
+            ("translation", "Hello", false),
+            ("translation", "Hello world", false),
+            ("translation", "Hello world", true),
+            ("original", "再见", false),
+        ]
+        .map(|(side, text, done)| (side, text.to_string(), done));
+        assert_eq!(fragments, expected);
+    }
+
+    #[test]
+    fn qwen38_translation_closes_at_response_done() {
+        let fragments = replay(&[
+            serde_json::json!({"type": "response.text.delta", "delta": "Hi"}),
+            serde_json::json!({"type": "response.done", "response": {"id": "r1"}}),
+            serde_json::json!({"type": "response.done", "response": {"id": "r2"}}),
+        ]);
+        assert_eq!(
+            fragments,
+            [
+                ("translation", "Hi".into(), false),
+                ("translation", "Hi".into(), true)
+            ]
         );
     }
 
     #[test]
-    fn continuous_audio_uses_server_vad() {
-        let cfg = config("beijing", "llm-test", CURRENT_MODEL);
-        let update: serde_json::Value = serde_json::from_str(&build_session_update(&cfg)).unwrap();
-        assert_eq!(update["session"]["sample_rate"], 16000);
-        assert_eq!(update["session"]["turn_detection"]["type"], "server_vad");
-        assert!(update["event_id"]
-            .as_str()
-            .is_some_and(|value| value.starts_with("event_session_")));
+    fn qwen35_snapshots_pass_through() {
+        let fragments = replay(&[
+            serde_json::json!({"type": "response.text.text", "text": "Hel", "stash": "lo"}),
+            serde_json::json!({"type": "response.text.done", "response_id": "r1", "text": "Hello"}),
+            serde_json::json!({"type": "response.text.done", "response_id": "r1", "text": "Hello"}),
+            serde_json::json!({"type": "response.done", "response": {"id": "r1"}}),
+        ]);
+        assert_eq!(
+            fragments,
+            [
+                ("translation", "Hello".into(), false),
+                ("translation", "Hello".into(), true)
+            ]
+        );
     }
 
     #[test]
@@ -504,7 +641,7 @@ mod tests {
 
     #[test]
     fn redacts_credentials_from_connection_errors() {
-        let cfg = config("beijing", "workspace-secret", CURRENT_MODEL);
+        let cfg = config("beijing", "workspace-secret", Protocol::LiveTranslate35);
         let error = sanitize_error(
             &cfg,
             "failed workspace-secret.cn-beijing.maas.aliyuncs.com with test-key",

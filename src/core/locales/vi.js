@@ -90,7 +90,7 @@ export default {
     captureApplicationSilent: 'Ứng dụng không có âm thanh',
     microphoneUnavailable: 'Không thể dùng micrô. Hãy kiểm tra quyền và thiết bị đầu vào.',
     networkUnavailable: 'Không thể kết nối trình dịch. Hãy kiểm tra mạng và thử lại.',
-    workspaceRequired: 'Qwen 3.5 cần Workspace ID.',
+    workspaceRequired: 'Qwen cần Workspace ID.',
     chooseAudioSource: 'Hãy bật ít nhất một nguồn âm thanh.',
     invalidLanguagePair: 'Hãy chọn hai ngôn ngữ khác nhau.',
     autoCheckUpdates: 'Tự động kiểm tra cập nhật',

@@ -90,7 +90,7 @@ export default {
     captureApplicationSilent: '앱에 오디오 없음',
     microphoneUnavailable: '마이크를 사용할 수 없습니다. 권한과 입력 장치를 확인하세요.',
     networkUnavailable: '번역 서비스에 연결할 수 없습니다. 네트워크를 확인한 후 다시 시도하세요.',
-    workspaceRequired: 'Qwen 3.5에는 Workspace ID가 필요합니다.',
+    workspaceRequired: 'Qwen에는 Workspace ID가 필요합니다.',
     chooseAudioSource: '오디오를 하나 이상 켜세요.',
     invalidLanguagePair: '서로 다른 두 언어를 선택하세요.',
     autoCheckUpdates: '업데이트 자동 확인',

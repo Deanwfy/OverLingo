@@ -37,6 +37,41 @@ impl Event {
     }
 }
 
+/// Joins delta streams into the whole-segment snapshots that fragments must carry.
+#[derive(Default)]
+pub struct Joined {
+    original: String,
+    translation: String,
+}
+
+impl Joined {
+    fn side(&mut self, kind: FragmentKind) -> &mut String {
+        match kind {
+            FragmentKind::Original => &mut self.original,
+            FragmentKind::Translation => &mut self.translation,
+        }
+    }
+
+    pub fn push(&mut self, kind: FragmentKind, delta: &str, events: &Events) {
+        let side = self.side(kind);
+        side.push_str(delta);
+        events.emit(Event::fragment(kind, side.clone(), false));
+    }
+
+    /// Emits what has been joined as final, if anything.
+    pub fn finish(&mut self, kind: FragmentKind, events: &Events) {
+        let text = std::mem::take(self.side(kind));
+        if !text.is_empty() {
+            events.emit(Event::fragment(kind, text, true));
+        }
+    }
+
+    /// Drops the joined text, for when the provider sends the final text itself.
+    pub fn clear(&mut self, kind: FragmentKind) {
+        self.side(kind).clear();
+    }
+}
+
 /// A handshake the server refused carries its reason in the response body, which the
 /// transport's own message drops in favour of the bare status line.
 pub fn connect_error(error: &tokio_tungstenite::tungstenite::Error) -> String {
@@ -157,6 +192,33 @@ impl ProviderState {
             connection.stop();
         }
     }
+}
+
+/// Fragments as `(side, text, final)`, in emission order.
+#[cfg(test)]
+pub(crate) type Collected = Arc<Mutex<Vec<(&'static str, String, bool)>>>;
+
+#[cfg(test)]
+pub(crate) fn collector() -> (Events, Collected) {
+    let collected = Arc::new(Mutex::new(Vec::new()));
+    let events = Events::callback({
+        let collected = collected.clone();
+        move |event| {
+            if let Event::Fragment {
+                kind,
+                text,
+                final_fragment,
+            } = event
+            {
+                let side = match kind {
+                    FragmentKind::Original => "original",
+                    FragmentKind::Translation => "translation",
+                };
+                collected.lock().unwrap().push((side, text, final_fragment));
+            }
+        }
+    });
+    (events, collected)
 }
 
 #[cfg(test)]

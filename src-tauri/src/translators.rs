@@ -5,6 +5,7 @@ use crate::providers::qwen_realtime::{self, QwenRealtimeConfig};
 use crate::providers::soniox_realtime::{self, SonioxRealtimeConfig};
 use crate::providers::{Events, ProviderState};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::sync::LazyLock;
 
 /// Everything one route needs to dial its translator. `api_key` is resolved from the
@@ -14,6 +15,8 @@ struct StartRequest<'a> {
     route: &'a RouteConfig,
     route_id: &'a str,
     api_key: &'a str,
+    /// The catalog's protocol tag for the route's model; only the provider reads it.
+    protocol: Option<&'a str>,
 }
 
 /// A provider: owns one API key and contributes one or more models. Everything
@@ -25,6 +28,8 @@ struct Engine {
     /// A precondition beyond holding an API key, as the notice code that blocks a start.
     blocker: fn(&AppConfig) -> Option<&'static str>,
     open: fn(StartRequest, Events, &ProviderState) -> Result<u64, String>,
+    /// Whether this provider can drive a model tagged with the given catalog protocol.
+    speaks: fn(Option<&str>) -> bool,
 }
 
 /// Regions the LiveTranslate realtime endpoint is documented in. Model Studio runs in more
@@ -66,12 +71,14 @@ const ENGINES: &[Engine] = &[
                     region: request.config.qwen.region.clone(),
                     workspace_id: request.config.qwen.workspace_id.clone(),
                     model: request.route.model.clone(),
+                    protocol: qwen_realtime::Protocol::parse(request.protocol)?,
                     route_id: request.route_id.into(),
                 },
                 events,
                 state,
             )
         },
+        speaks: |protocol| qwen_realtime::Protocol::parse(protocol).is_ok(),
     },
     Engine {
         id: "soniox",
@@ -89,6 +96,7 @@ const ENGINES: &[Engine] = &[
                 state,
             )
         },
+        speaks: |protocol| protocol.is_none(),
     },
     Engine {
         id: "openai",
@@ -105,6 +113,7 @@ const ENGINES: &[Engine] = &[
                 state,
             )
         },
+        speaks: |protocol| protocol.is_none(),
     },
 ];
 
@@ -115,19 +124,95 @@ struct Translator {
     id: String,
     #[serde(rename = "provider")]
     engine: String,
-    /// `None` when the model accepts any language pair.
-    languages: Option<Vec<String>>,
+    /// Which wire protocol the provider speaks for this model, when it has more than one.
+    protocol: Option<String>,
+    /// The model a retired route on this provider falls back to; one per provider.
+    #[serde(default)]
+    default: bool,
+    languages: Languages,
+}
+
+/// Language codes are BCP 47 throughout; an adapter translates its provider's spellings.
+#[derive(Deserialize)]
+struct Languages {
+    /// `None` when the model has no restriction of its own on this end.
+    source: Option<Codes>,
+    target: Option<Codes>,
+    /// Target → the sources allowed into it, for providers that only pair some languages.
+    #[serde(default)]
+    pairs: HashMap<String, Vec<String>>,
+}
+
+/// A list as the catalog writes it: inline, or the name of a set several models share.
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Codes {
+    Inline(Vec<String>),
+    Set(String),
+}
+
+impl Codes {
+    fn resolve(&mut self, sets: &HashMap<String, Vec<String>>) {
+        if let Codes::Set(name) = self {
+            let codes = sets
+                .get(name)
+                .unwrap_or_else(|| panic!("unknown language set {name}"));
+            *self = Codes::Inline(codes.clone());
+        }
+    }
+
+    fn contains(&self, code: &str) -> bool {
+        match self {
+            Codes::Inline(codes) => codes.iter().any(|known| known == code),
+            Codes::Set(name) => unreachable!("language set {name} is resolved at load"),
+        }
+    }
+}
+
+impl Languages {
+    fn allows(&self, source: &str, target: &str) -> bool {
+        let within = |codes: &Option<Codes>, code: &str| {
+            codes.as_ref().is_none_or(|codes| codes.contains(code))
+        };
+        within(&self.source, source)
+            && within(&self.target, target)
+            && self
+                .pairs
+                .get(target)
+                .is_none_or(|sources| sources.iter().any(|known| known == source))
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Catalog {
+    language_sets: HashMap<String, Vec<String>>,
+    models: Vec<Translator>,
 }
 
 /// The model catalog, read from the same file as the interface so the two cannot drift.
-/// - A provider's first entry is the model a retired route falls back to.
-/// - GPT Realtime Translate lists the 13 languages it translates *into*. Its input side
-///   accepts 70+, but a route needs both ends, so the narrower set governs.
-/// - Soniox's list is what `GET /v1/models` returns for the model. Codes outside it — `yue`
-///   and the other non-639-1 entries in the interface catalog — are rejected upstream.
+/// - GPT Realtime Translate translates into 13 languages but recognises the 70+ listed in
+///   OpenAI's realtime translation guide, by English name only. Mapped by judgement:
+///   "Norwegian" is `nb` beside "Nynorsk" as `nn`; "Filipino" and "Tagalog" are one
+///   language, kept once as `fil`.
+/// - Soniox's lists are what `GET /v1/models` returns for the model, with its `no` and `tl`
+///   written as `nb` and `fil`.
+/// - Both Qwen models share Alibaba's one table of 60; 3.8 detects the source itself but
+///   recognises the same set.
 static TRANSLATORS: LazyLock<Vec<Translator>> = LazyLock::new(|| {
-    serde_json::from_str(include_str!("../../src/core/translators.json"))
-        .expect("src/core/translators.json is a valid catalog")
+    let mut catalog: Catalog =
+        serde_json::from_str(include_str!("../../src/core/translators.json"))
+            .expect("src/core/translators.json is a valid catalog");
+    for entry in &mut catalog.models {
+        let languages = &mut entry.languages;
+        for codes in [&mut languages.source, &mut languages.target]
+            .into_iter()
+            .flatten()
+        {
+            codes.resolve(&catalog.language_sets);
+        }
+    }
+    catalog.models
 });
 
 fn translator(model: &str) -> Option<&'static Translator> {
@@ -184,7 +269,7 @@ pub(crate) fn route_config_error(
     if source_language == target_language {
         return Some("invalidLanguagePair");
     }
-    if !supports_language(model, source_language) || !supports_language(model, target_language) {
+    if !supports_pair(model, source_language, target_language) {
         return Some("unsupportedLanguage");
     }
     None
@@ -201,11 +286,16 @@ pub(crate) fn open_session(
     let Some(entry) = engine(&route.engine) else {
         return Err(format!("Unsupported translator: {}", route.engine));
     };
+    let protocol = translator(&route.model).and_then(|model| model.protocol.as_deref());
+    if !(entry.speaks)(protocol) {
+        return Err(format!("Unsupported protocol for {}", route.model));
+    }
     let request = StartRequest {
         config,
         route,
         route_id,
         api_key: credentials.get(&route.engine),
+        protocol,
     };
     (entry.open)(request, events, state)
 }
@@ -214,7 +304,7 @@ pub(crate) fn open_session(
 pub(crate) fn default_model(engine: &str) -> &'static str {
     TRANSLATORS
         .iter()
-        .find(|entry| entry.engine == engine)
+        .find(|entry| entry.engine == engine && entry.default)
         .map_or("", |entry| entry.id.as_str())
 }
 
@@ -223,11 +313,8 @@ pub(crate) fn model_ids() -> impl Iterator<Item = &'static str> {
     TRANSLATORS.iter().map(|entry| entry.id.as_str())
 }
 
-fn supports_language(model: &str, language: &str) -> bool {
-    translator(model).is_some_and(|entry| match &entry.languages {
-        None => true,
-        Some(languages) => languages.iter().any(|code| code == language),
-    })
+fn supports_pair(model: &str, source: &str, target: &str) -> bool {
+    translator(model).is_some_and(|entry| entry.languages.allows(source, target))
 }
 
 #[cfg(test)]
@@ -243,11 +330,25 @@ mod tests {
         }
     }
 
-    /// An engine with no model would leave routes that select it with nothing to dial.
+    /// An engine with no default would leave a retired route with nothing to dial, and two
+    /// would make the fallback depend on file order.
     #[test]
-    fn every_engine_offers_a_model() {
-        for entry in ENGINES {
-            assert!(!default_model(entry.id).is_empty(), "{}", entry.id);
+    fn every_engine_has_exactly_one_default() {
+        for engine in ENGINES {
+            let defaults = TRANSLATORS
+                .iter()
+                .filter(|entry| entry.engine == engine.id && entry.default)
+                .count();
+            assert_eq!(defaults, 1, "{}", engine.id);
+        }
+    }
+
+    /// A model whose protocol its provider cannot speak would fail only when dialled.
+    #[test]
+    fn every_model_names_a_protocol_its_engine_speaks() {
+        for entry in TRANSLATORS.iter() {
+            let engine = engine(&entry.engine).unwrap();
+            assert!((engine.speaks)(entry.protocol.as_deref()), "{}", entry.id);
         }
     }
 
@@ -318,7 +419,9 @@ mod tests {
         assert_eq!(route_config_error(soniox, "yue", "en"), unsupported);
         assert_eq!(route_config_error(soniox, "en", "yue"), unsupported);
         assert_eq!(route_config_error(soniox, "en", "zh"), None);
+        // OpenAI hears far more languages than it speaks, so each end is held to its own set.
         assert_eq!(route_config_error(openai, "en", "nl"), unsupported);
+        assert_eq!(route_config_error(openai, "nl", "en"), None);
         // Qwen takes the whole catalog, so the pair Soniox refused stays valid there.
         assert_eq!(route_config_error(qwen, "yue", "en"), None);
     }
@@ -339,8 +442,27 @@ mod tests {
     #[test]
     fn narrow_models_reject_unsupported_languages() {
         let openai = default_model("openai");
-        assert!(supports_language(openai, "ja"));
-        assert!(!supports_language(openai, "nl"));
-        assert!(supports_language(default_model("qwen"), "nl"));
+        assert!(supports_pair(openai, "en", "ja"));
+        assert!(!supports_pair(openai, "en", "nl"));
+        assert!(supports_pair(default_model("qwen"), "en", "nl"));
+    }
+
+    /// The interface runs the same cases, so its labels and this gate cannot disagree.
+    #[test]
+    fn language_rules_match_the_shared_cases() {
+        #[derive(Deserialize)]
+        struct Rule {
+            about: String,
+            languages: Languages,
+            cases: Vec<(String, String, bool)>,
+        }
+        let rules: Vec<Rule> =
+            serde_json::from_str(include_str!("../../tests/fixtures/language-rules.json")).unwrap();
+        for rule in rules {
+            for (source, target, allowed) in rule.cases {
+                let shown = format!("{}: {source} -> {target}", rule.about);
+                assert_eq!(rule.languages.allows(&source, &target), allowed, "{shown}");
+            }
+        }
     }
 }

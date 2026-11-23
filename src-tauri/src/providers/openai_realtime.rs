@@ -1,4 +1,4 @@
-use super::{connect_error, Connection, Event, Events, FragmentKind, ProviderState};
+use super::{connect_error, Connection, Event, Events, FragmentKind, Joined, ProviderState};
 use crate::audio::resampler::UpsamplerTo24k;
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures_util::{SinkExt, StreamExt};
@@ -29,8 +29,7 @@ const SEGMENT_CAP: Duration = Duration::from_secs(10);
 /// segment; a provider owes the controller snapshots, not deltas.
 #[derive(Default)]
 struct Segments {
-    original: String,
-    translation: String,
+    joined: Joined,
     last_delta: Option<Instant>,
     first_delta: Option<Instant>,
 }
@@ -51,20 +50,8 @@ impl Segments {
 
     /// Both sides become final together so the assembler pairs them into one turn.
     fn commit(&mut self, events: &Events) {
-        if !self.original.is_empty() {
-            events.emit(Event::fragment(
-                FragmentKind::Original,
-                std::mem::take(&mut self.original),
-                true,
-            ));
-        }
-        if !self.translation.is_empty() {
-            events.emit(Event::fragment(
-                FragmentKind::Translation,
-                std::mem::take(&mut self.translation),
-                true,
-            ));
-        }
+        self.joined.finish(FragmentKind::Original, events);
+        self.joined.finish(FragmentKind::Translation, events);
         self.last_delta = None;
         self.first_delta = None;
     }
@@ -264,24 +251,16 @@ fn handle_server_event(text: &str, events: &Events, segments: &mut Segments) {
         "session.created" | "session.updated" => {}
         "session.input_transcript.delta" => {
             if let Some(delta) = value.get("delta").and_then(|v| v.as_str()) {
-                segments.original.push_str(delta);
                 segments.note_delta();
-                events.emit(Event::fragment(
-                    FragmentKind::Original,
-                    segments.original.clone(),
-                    false,
-                ));
+                segments.joined.push(FragmentKind::Original, delta, events);
             }
         }
         "session.output_transcript.delta" => {
             if let Some(delta) = value.get("delta").and_then(|v| v.as_str()) {
-                segments.translation.push_str(delta);
                 segments.note_delta();
-                events.emit(Event::fragment(
-                    FragmentKind::Translation,
-                    segments.translation.clone(),
-                    false,
-                ));
+                segments
+                    .joined
+                    .push(FragmentKind::Translation, delta, events);
             }
         }
         // Translated speech; unused, subtitles only need the transcripts.
@@ -315,7 +294,7 @@ fn handle_server_event(text: &str, events: &Events, segments: &mut Segments) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Arc;
+    use crate::providers::collector;
 
     #[test]
     /// The endpoint rejects any attempt to pin the input language, so only the output one
@@ -336,20 +315,7 @@ mod tests {
     /// ever becomes final.
     #[test]
     fn deltas_are_joined_into_snapshots_and_reset_on_commit() {
-        let collected = Arc::new(Mutex::new(Vec::new()));
-        let events = Events::callback({
-            let collected = collected.clone();
-            move |event| {
-                if let Event::Fragment {
-                    kind: FragmentKind::Translation,
-                    text,
-                    final_fragment,
-                } = event
-                {
-                    collected.lock().unwrap().push((text, final_fragment));
-                }
-            }
-        });
+        let (events, collected) = collector();
         let mut segments = Segments::default();
         let delta = |value: &str| {
             format!(r#"{{"type":"session.output_transcript.delta","delta":"{value}"}}"#)
@@ -365,11 +331,11 @@ mod tests {
 
         assert_eq!(
             *collected.lock().unwrap(),
-            vec![
-                ("hel".into(), false),
-                ("hello".into(), false),
-                ("hello".into(), true),
-                ("bye".into(), false),
+            [
+                ("translation", "hel".into(), false),
+                ("translation", "hello".into(), false),
+                ("translation", "hello".into(), true),
+                ("translation", "bye".into(), false),
             ]
         );
     }
@@ -377,24 +343,7 @@ mod tests {
     /// Both transcripts close together so the assembler pairs them into one turn.
     #[test]
     fn a_commit_finalises_both_sides_at_once() {
-        let collected = Arc::new(Mutex::new(Vec::new()));
-        let events = Events::callback({
-            let collected = collected.clone();
-            move |event| {
-                if let Event::Fragment {
-                    kind,
-                    text,
-                    final_fragment: true,
-                } = event
-                {
-                    let side = match kind {
-                        FragmentKind::Original => "original",
-                        FragmentKind::Translation => "translation",
-                    };
-                    collected.lock().unwrap().push((side, text));
-                }
-            }
-        });
+        let (events, collected) = collector();
         let mut segments = Segments::default();
         handle_server_event(
             r#"{"type":"session.input_transcript.delta","delta":"hola"}"#,
@@ -406,15 +355,18 @@ mod tests {
             &events,
             &mut segments,
         );
-        assert!(segments.due() || !segments.original.is_empty());
         segments.commit(&events);
 
+        let finals: Vec<_> = collected
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, _, done)| *done)
+            .map(|(side, text, _)| (*side, text.clone()))
+            .collect();
         assert_eq!(
-            *collected.lock().unwrap(),
-            vec![
-                ("original", "hola".to_string()),
-                ("translation", "hello".to_string()),
-            ]
+            finals,
+            [("original", "hola".into()), ("translation", "hello".into())]
         );
         assert!(!segments.due());
     }
